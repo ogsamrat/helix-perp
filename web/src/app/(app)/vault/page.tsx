@@ -44,3 +44,49 @@ export default function VaultPage() {
       const capped = shareAmt > myShares ? myShares : shareAmt;
       call = calls.removeLiquidity(address, capped);
     }
+    const res = await action.mutateAsync({ call });
+    if (res) setAmt("");
+  };
+
+  const max = mode === "deposit" ? balUnits : myValueUnits;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-lg font-semibold tracking-tight text-ink">Liquidity Vault</h1>
+        <p className="text-sm text-ink-muted">
+          Provide USDC liquidity that backs every position. Earn taker fees + funding; bear trader PnL.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Vault TVL" value={fmtCompactUsd(tvl)} sub="LP liquidity" />
+        <StatTile label="Utilization" value={fmtPct(utilization / 100)} sub="margin / assets" />
+        <StatTile label="Share price" value={"$" + sharePriceUnits.toFixed(6)} sub="USDC per share" />
+        <StatTile
+          label="Realized LP return"
+          value={<span className={realizedReturn >= 0 ? "text-long" : "text-short"}>{fmtPct(realizedReturn)}</span>}
+          sub="since inception"
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Vault overview</CardTitle>
+            <Layers className="h-4 w-4 text-ink-faint" />
+          </CardHeader>
+          <CardBody className="space-y-1">
+            <StatRow label="Total liquidity (LP cash)" value={fmtUsd(stats.data?.lpCash ?? 0n)} />
+            <StatRow label="Locked margin" value={fmtUsd(stats.data?.marginPool ?? 0n)} />
+            <StatRow label="Total assets" value={fmtUsd(stats.data?.totalAssets ?? 0n)} />
+            <StatRow label="Total shares" value={(toUnits(stats.data?.totalShares ?? 0n)).toLocaleString()} />
+            <div className="my-2 h-px bg-hairline" />
+            <StatRow label="Your shares" value={toUnits(myShares).toLocaleString()} />
+            <StatRow label="Your position value" value={<span className="text-brand">{fmtUsd(myValueScaled)}</span>} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Provide liquidity</CardTitle>

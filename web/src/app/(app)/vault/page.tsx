@@ -90,3 +90,49 @@ export default function VaultPage() {
         <Card>
           <CardHeader>
             <CardTitle>Provide liquidity</CardTitle>
+          </CardHeader>
+          <CardBody className="space-y-4">
+            <Segmented
+              options={[
+                { label: "Deposit", value: "deposit" },
+                { label: "Withdraw", value: "withdraw" },
+              ]}
+              value={mode}
+              onChange={(v) => setMode(v as "deposit" | "withdraw")}
+              className="w-full [&>button]:flex-1"
+            />
+            <AmountField
+              label={mode === "deposit" ? "Deposit USDC" : "Withdraw USDC"}
+              value={amt}
+              onChange={setAmt}
+              onMax={address ? () => setAmt((Math.floor(max * 100) / 100).toString()) : undefined}
+              hint={<span className="text-ink-faint">Max {fmtUsd(toScaled(max))}</span>}
+            />
+            <div className="rounded-lg border border-hairline bg-canvas p-3">
+              <StatRow label="Share price" value={"$" + sharePriceUnits.toFixed(6)} />
+              <StatRow
+                label={mode === "deposit" ? "Shares received" : "Shares burned"}
+                value={(sharePriceUnits > 0 ? amount / sharePriceUnits : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              />
+            </div>
+            {address ? (
+              <Button
+                variant="primary"
+                className="w-full"
+                loading={action.isPending}
+                disabled={amount <= 0 || amount > max + 1e-6}
+                onClick={submit}
+              >
+                {amount > max + 1e-6 ? "Amount exceeds max" : mode === "deposit" ? "Deposit" : "Withdraw"}
+              </Button>
+            ) : (
+              <Button variant="primary" className="w-full" onClick={() => connect()}>
+                Connect wallet
+              </Button>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+    </div>
+  );
+}

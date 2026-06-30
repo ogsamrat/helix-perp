@@ -153,3 +153,81 @@ impl MarketRegistry {
             .get(&DataKey::Market(id))
             .unwrap_or_else(|| panic_with_error!(e, RegistryError::MarketNotFound))
     }
+
+    pub fn has_market(e: &Env, id: u32) -> bool {
+        e.storage().persistent().has(&DataKey::Market(id))
+    }
+
+    pub fn market_ids(e: &Env) -> Vec<u32> {
+        e.storage()
+            .instance()
+            .get(&DataKey::MarketIds)
+            .unwrap_or(Vec::new(e))
+    }
+
+    /// All market configs — convenience for the frontend market list.
+    pub fn get_all_markets(e: &Env) -> Vec<MarketConfig> {
+        let ids = Self::market_ids(e);
+        let mut out = Vec::new(e);
+        for id in ids.iter() {
+            if let Some(cfg) = e
+                .storage()
+                .persistent()
+                .get::<_, MarketConfig>(&DataKey::Market(id))
+            {
+                out.push_back(cfg);
+            }
+        }
+        out
+    }
+
+    /// Global pause state — read by `perp_engine` before any state transition.
+    pub fn is_paused(e: &Env) -> bool {
+        pausable::paused(e)
+    }
+
+    /// Whether `who` holds the `keeper` role — read by `perp_engine.liquidate` and
+    /// `update_funding`.
+    pub fn is_keeper(e: &Env, who: Address) -> bool {
+        access_control::has_role(e, &who, &Symbol::new(e, "keeper")).is_some()
+    }
+
+    // ------------------------------------------------------------- internals
+
+    fn store_market(e: &Env, cfg: &MarketConfig) {
+        let key = DataKey::Market(cfg.id);
+        e.storage().persistent().set(&key, cfg);
+        e.storage()
+            .persistent()
+            .extend_ttl(&key, BUMP_THRESHOLD, BUMP_AMOUNT);
+        e.storage()
+            .instance()
+            .extend_ttl(BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+
+    fn validate(e: &Env, cfg: &MarketConfig) {
+        let ok = cfg.max_leverage >= 1
+            && cfg.imr_bps > 0
+            && cfg.mmr_bps > 0
+            && (cfg.mmr_bps as i128) < (cfg.imr_bps as i128)
+            // imr must be consistent with the advertised max leverage (imr >= 1/lev)
+            && (cfg.imr_bps as i128) * (cfg.max_leverage as i128) >= BPS_DENOM
+            && cfg.taker_fee_bps < 1_000
+            && cfg.liquidation_fee_bps < 5_000
+            && cfg.max_oi > 0
+            && cfg.min_position_size > 0
+            && cfg.min_position_size <= cfg.max_oi;
+        if !ok {
+            panic_with_error!(e, RegistryError::InvalidConfig);
+        }
+    }
+}
+
+/// Expose the full OpenZeppelin AccessControl entrypoints (grant_role, revoke_role,
+/// has_role, get_admin, …) so the admin can manage keepers/pausers post-deploy and
+/// the frontend can introspect roles.
+#[contractimpl(contracttrait)]
+impl AccessControl for MarketRegistry {}
+
+#[cfg(test)]
+mod test;

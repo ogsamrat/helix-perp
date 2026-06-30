@@ -272,3 +272,141 @@ impl CollateralVault {
             }
             Self::set_margin_pool(e, margin_pool - delta);
             Self::set_lp_cash(e, lp_cash + delta);
+        } else {
+            let d = -delta;
+            if lp_cash < d {
+                panic_with_error!(e, VaultError::InsufficientLiquidity);
+            }
+            Self::set_lp_cash(e, lp_cash - d);
+            Self::set_margin_pool(e, margin_pool + d);
+        }
+        Self::bump(e);
+    }
+
+    // ------------------------------------------------------------------ views
+
+    pub fn lp_cash(e: &Env) -> i128 {
+        e.storage().instance().get(&DataKey::LpCash).unwrap_or(0)
+    }
+    pub fn margin_pool(e: &Env) -> i128 {
+        e.storage()
+            .instance()
+            .get(&DataKey::MarginPool)
+            .unwrap_or(0)
+    }
+    pub fn total_shares(e: &Env) -> i128 {
+        e.storage()
+            .instance()
+            .get(&DataKey::TotalShares)
+            .unwrap_or(0)
+    }
+    pub fn shares_of(e: &Env, who: Address) -> i128 {
+        e.storage()
+            .persistent()
+            .get(&DataKey::Shares(who))
+            .unwrap_or(0)
+    }
+    /// Total USDC held = LP liquidity + locked margin (should equal token balance).
+    pub fn total_assets(e: &Env) -> i128 {
+        Self::lp_cash(e) + Self::margin_pool(e)
+    }
+    /// LP share price, scaled to `PRICE_SCALE` (1e7 == 1.0 USDC per share).
+    pub fn share_price(e: &Env) -> i128 {
+        let total_shares = Self::total_shares(e);
+        if total_shares == 0 {
+            PRICE_SCALE
+        } else {
+            (Self::lp_cash(e) * PRICE_SCALE) / total_shares
+        }
+    }
+    /// Vault utilisation in bps: locked margin / total assets.
+    pub fn utilization_bps(e: &Env) -> i128 {
+        let total = Self::total_assets(e);
+        if total == 0 {
+            0
+        } else {
+            (Self::margin_pool(e) * 10_000) / total
+        }
+    }
+    pub fn token_address(e: &Env) -> Address {
+        e.storage().instance().get(&DataKey::Token).unwrap()
+    }
+    pub fn engine(e: &Env) -> Option<Address> {
+        e.storage().instance().get(&DataKey::Engine)
+    }
+
+    // -------------------------------------------------------------- internals
+
+    /// Release `margin` from `margin_pool` and route the net `total_out − margin`
+    /// to/from `lp_cash`, refusing to overpay LP liquidity.
+    fn move_pools(e: &Env, margin: i128, total_out: i128) {
+        if margin < 0 || total_out < 0 {
+            panic_with_error!(e, VaultError::InvalidAmount);
+        }
+        let margin_pool = Self::margin_pool(e);
+        if margin_pool < margin {
+            panic_with_error!(e, VaultError::AccountingError);
+        }
+        Self::set_margin_pool(e, margin_pool - margin);
+
+        let delta = total_out - margin; // > 0: LPs fund profit; < 0: LPs keep loss
+        let lp_cash = Self::lp_cash(e);
+        if delta > 0 {
+            if lp_cash < delta {
+                panic_with_error!(e, VaultError::InsufficientLiquidity);
+            }
+            Self::set_lp_cash(e, lp_cash - delta);
+        } else {
+            Self::set_lp_cash(e, lp_cash + (-delta));
+        }
+    }
+
+    fn require_engine(e: &Env) {
+        let engine: Address = e
+            .storage()
+            .instance()
+            .get(&DataKey::Engine)
+            .unwrap_or_else(|| panic_with_error!(e, VaultError::EngineNotSet));
+        engine.require_auth();
+    }
+
+    fn admin(e: &Env) -> Address {
+        e.storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("admin not set")
+    }
+    fn token(e: &Env) -> TokenClient<'static> {
+        TokenClient::new(e, &Self::token_address(e))
+    }
+    fn set_lp_cash(e: &Env, v: i128) {
+        e.storage().instance().set(&DataKey::LpCash, &v);
+    }
+    fn set_margin_pool(e: &Env, v: i128) {
+        e.storage().instance().set(&DataKey::MarginPool, &v);
+    }
+    fn set_total_shares(e: &Env, v: i128) {
+        e.storage().instance().set(&DataKey::TotalShares, &v);
+    }
+    fn add_shares(e: &Env, who: &Address, delta: i128) {
+        let key = DataKey::Shares(who.clone());
+        let cur: i128 = e.storage().persistent().get(&key).unwrap_or(0);
+        let next = cur + delta;
+        if next == 0 {
+            e.storage().persistent().remove(&key);
+        } else {
+            e.storage().persistent().set(&key, &next);
+            e.storage()
+                .persistent()
+                .extend_ttl(&key, BUMP_THRESHOLD, BUMP_AMOUNT);
+        }
+    }
+    fn bump(e: &Env) {
+        e.storage()
+            .instance()
+            .extend_ttl(BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+}
+
+#[cfg(test)]
+mod test;

@@ -48,3 +48,53 @@ export function WalletButton() {
             </div>
             <div className="mt-2 px-1">
               <GetFundsButton size="sm" variant="secondary" className="w-full" />
+            </div>
+            <div className="mt-1 space-y-0.5">
+              <MenuItem
+                icon={<Copy className="h-3.5 w-3.5" />}
+                label="Copy address"
+                onClick={() => navigator.clipboard.writeText(address)}
+              />
+              <a href={explorerAccount(address)} target="_blank" rel="noreferrer" className="block">
+                <MenuItem icon={<ExternalLink className="h-3.5 w-3.5" />} label="View on explorer" />
+              </a>
+              <MenuItem
+                icon={<LogOut className="h-3.5 w-3.5" />}
+                label="Disconnect"
+                danger
+                onClick={() => {
+                  disconnect();
+                  setOpen(false);
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors hover:bg-canvas ${
+        danger ? "text-short" : "text-ink-muted hover:text-ink"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}

@@ -1,0 +1,20 @@
+[package]
+name = "collateral_vault"
+description = "Custody + LP accounting: holds USDC for trader margin and LP liquidity, settles PnL"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+helix-shared = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+mock_usdc = { path = "../mock_usdc" }

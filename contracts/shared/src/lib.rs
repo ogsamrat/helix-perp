@@ -58,3 +58,63 @@ pub struct MarketConfig {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OraclePrice {
+    /// Price in USDC terms, scaled to `PRICE_SCALE` (7 dp).
+    pub price: i128,
+    /// Ledger timestamp (unix seconds) the upstream feed reported.
+    pub timestamp: u64,
+}
+
+/// Reflector oracle asset selector. The variant names + payloads match the
+/// Reflector SEP-40 interface exactly so cross-contract XDR (de)serialises
+/// against the live oracle without a custom client.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReflectorAsset {
+    Stellar(Address),
+    Other(Symbol),
+}
+
+/// Reflector oracle price record (matches Reflector's `PriceData`). `price` is at
+/// the oracle's native precision (`decimals()`), normalised downstream by the
+/// `oracle_adapter` to `PRICE_SCALE`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReflectorPriceData {
+    pub price: i128,
+    pub timestamp: u64,
+}
+
+/// Position side. Stored as an explicit enum for readable bindings + events.
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Side {
+    Long,
+    Short,
+}
+
+// ----------------------------------------------------------------------------
+// Fixed-point math. With `overflow-checks = true` (set in the workspace release
+// profile and on by default in test builds) every operation here traps on
+// overflow rather than wrapping — the fail-safe behaviour we want in a protocol
+// that custodies funds.
+// ----------------------------------------------------------------------------
+
+/// `floor((a * b) / denom)` with truncation toward zero, in i128. Intended for
+/// non-negative `a`/`b`; `denom` must be > 0.
+pub fn mul_div(a: i128, b: i128, denom: i128) -> i128 {
+    (a * b) / denom
+}
+
+/// `amount * bps / 10_000` — apply a basis-point rate to a (signed) amount.
+pub fn apply_bps(amount: i128, bps: u32) -> i128 {
+    (amount * bps as i128) / BPS_DENOM
+}
+
+/// Signed PnL of a position given entry/mark price and side. Result is 7-dp USDC.
+///
+/// `notional` is the entry notional (always positive). For a long, PnL is
+/// `notional * (mark - entry) / entry`; for a short it is the negation.
+pub fn position_pnl(notional: i128, entry: i128, mark: i128, side: Side) -> i128 {
+    let diff = match side {
+        Side::Long => mark - entry,
+        Side::Short => entry - mark,

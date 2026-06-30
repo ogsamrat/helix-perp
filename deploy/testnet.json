@@ -1,0 +1,23 @@
+{
+    "network":  "testnet",
+    "admin":  "GBDKBXO7IGPNYDMVSTJAGPTXQPK32K45YQOFJ54QF6JAAOZDYGXXNMKO",
+    "keeper":  "GBDKBXO7IGPNYDMVSTJAGPTXQPK32K45YQOFJ54QF6JAAOZDYGXXNMKO",
+    "deployed_at":  "2026-06-30T17:55:09.1372219Z",
+    "latest_tx":  "53135c0ac35a9de6cb8371e24c1bbfeb237259970d4ef1f7d8b56689f0a61bf0",
+    "contracts":  {
+                      "mock_usdc":  "CCZ23IOAR23RXTJPLGR3A6SD4TLBIYFU4E42YRKC2RPVX2QRPUROIKBA",
+                      "mock_oracle":  "CCIQ2IQLXN576DBZDLP6GKBBWQVYAZN2JHBGM4QQHFSVGBBKRK7W6WYZ",
+                      "oracle_adapter":  "CCMYNSD7ZYZVVFRRNNKSSMKQQTUDXBO3TCL6GBGMF4GKIFYBCK6IMQAW",
+                      "market_registry":  "CBKYVMWPQB7R3NXBJ45HVRZMIXFJ2NMRALCHLQHSVQY3MGN7D57SQZXL",
+                      "collateral_vault":  "CBKEHG7LINNB73UIEKZNL7ALV7KYT63JU6WLD2BVUUW5GNO7764GVI2W",
+                      "perp_engine":  "CCNRZNFFDPY7Y2YNVTLT6RLCHIRHAX5D3B5TX7F2J3PBPO6FEKNBF3RU"
+                  },
+    "explorer":  {
+                     "mock_usdc":  "https://stellar.expert/explorer/testnet/contract/CCZ23IOAR23RXTJPLGR3A6SD4TLBIYFU4E42YRKC2RPVX2QRPUROIKBA",
+                     "oracle_adapter":  "https://stellar.expert/explorer/testnet/contract/CCMYNSD7ZYZVVFRRNNKSSMKQQTUDXBO3TCL6GBGMF4GKIFYBCK6IMQAW",
+                     "market_registry":  "https://stellar.expert/explorer/testnet/contract/CBKYVMWPQB7R3NXBJ45HVRZMIXFJ2NMRALCHLQHSVQY3MGN7D57SQZXL",
+                     "collateral_vault":  "https://stellar.expert/explorer/testnet/contract/CBKEHG7LINNB73UIEKZNL7ALV7KYT63JU6WLD2BVUUW5GNO7764GVI2W",
+                     "perp_engine":  "https://stellar.expert/explorer/testnet/contract/CCNRZNFFDPY7Y2YNVTLT6RLCHIRHAX5D3B5TX7F2J3PBPO6FEKNBF3RU",
+                     "latest_tx":  "https://stellar.expert/explorer/testnet/tx/53135c0ac35a9de6cb8371e24c1bbfeb237259970d4ef1f7d8b56689f0a61bf0"
+                 }
+}

@@ -40,3 +40,45 @@ export function OrderTicket({ meta, cfg, price }: { meta: MarketMeta; cfg: Marke
         ? `Min size ${fmtUsd(cfg.minPositionSize)}`
         : totalCost > balanceUnits + 1e-6
           ? "Insufficient USDC"
+          : null;
+
+  const setMax = () => {
+    const denom = 1 + (leverage * cfg.takerFeeBps) / 10_000;
+    setMargin(Math.max(0, Math.floor((balanceUnits / denom) * 100) / 100).toString());
+  };
+
+  const submit = async () => {
+    if (!address) return;
+    await action.mutateAsync({
+      call: calls.openPosition(
+        address,
+        cfg.id,
+        side,
+        toScaled(marginUnits),
+        toScaled(preview.notional),
+        BigInt(Math.round(price * 1e7)),
+        slippageBps,
+      ),
+    });
+    setMargin("");
+  };
+
+  return (
+    <div className="space-y-4">
+      <Segmented<Side>
+        options={[
+          { label: "Long", value: "Long" },
+          { label: "Short", value: "Short" },
+        ]}
+        value={side}
+        onChange={setSide}
+        className={`w-full [&>button]:flex-1 ${side === "Long" ? "[&>button[data-on]]:text-long" : ""}`}
+      />
+
+      <AmountField
+        label="Margin"
+        value={margin}
+        onChange={setMargin}
+        onMax={address ? setMax : undefined}
+        hint={
+          address ? (

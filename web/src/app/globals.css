@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* surfaces — near-black canvas + 2 elevations */
+  --canvas: 8 9 12;
+  --surface: 13 15 19;
+  --elevated: 20 23 29;
+  --hairline: 32 36 44;
+  --line: 46 51 61;
+
+  /* text */
+  --ink: 233 236 242;
+  --ink-muted: 142 149 162;
+  --ink-faint: 92 99 112;
+
+  /* brand — warm gold (the RWA / FX story), used sparingly */
+  --brand: 226 178 99;
+  --brand-muted: 150 118 64;
+
+  /* directional / pnl semantics */
+  --long: 46 199 133;
+  --short: 240 105 118;
+  --warn: 240 186 90;
+
+  --ring: 226 178 99;
+  --radius: 0.625rem;
+
+  /* type system — Geist (UI) + Geist Mono (all numerics) */
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    border-color: rgb(var(--hairline));
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background-color: rgb(var(--canvas));
+    color: rgb(var(--ink));
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "cv01";

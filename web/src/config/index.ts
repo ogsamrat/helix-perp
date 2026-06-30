@@ -46,3 +46,51 @@ export interface MarketMeta {
 
 /**
  * Display metadata for the listed markets (angle B: FX & tokenized-RWA perps —
+ * the "could only be built on Stellar" story). The engine itself is asset-agnostic;
+ * this is purely presentational. Numeric params live on-chain in market_registry.
+ */
+export const MARKETS: MarketMeta[] = [
+  {
+    id: 1,
+    symbol: "XAUPERP",
+    feed: "XAU",
+    name: "Gold",
+    ticker: "XAU-PERP",
+    base: "XAU",
+    quote: "USD",
+    kind: "Metal",
+    blurb: "Leveraged exposure to spot gold, settled in on-chain USDC.",
+    priceDecimals: 2,
+  },
+  {
+    id: 2,
+    symbol: "EURPERP",
+    feed: "EUR",
+    name: "Euro",
+    ticker: "EUR-PERP",
+    base: "EUR",
+    quote: "USD",
+    kind: "FX",
+    blurb: "Trade EUR/USD with up to 25x — FX perps, on Stellar.",
+    priceDecimals: 4,
+  },
+  {
+    id: 3,
+    symbol: "XLMPERP",
+    feed: "XLM",
+    name: "Stellar Lumens",
+    ticker: "XLM-PERP",
+    base: "XLM",
+    quote: "USD",
+    kind: "Crypto",
+    blurb: "The native asset. Perpetual exposure with on-chain settlement.",
+    priceDecimals: 4,
+  },
+];
+
+export const marketById = (id: number) => MARKETS.find((m) => m.id === id);
+export const marketBySymbol = (s: string) => MARKETS.find((m) => m.symbol === s);
+
+export const explorerContract = (id: string) => `${CONFIG.explorer}/contract/${id}`;
+export const explorerTx = (hash: string) => `${CONFIG.explorer}/tx/${hash}`;
+export const explorerAccount = (addr: string) => `${CONFIG.explorer}/account/${addr}`;

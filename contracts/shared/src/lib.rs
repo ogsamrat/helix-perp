@@ -118,3 +118,63 @@ pub fn position_pnl(notional: i128, entry: i128, mark: i128, side: Side) -> i128
     let diff = match side {
         Side::Long => mark - entry,
         Side::Short => entry - mark,
+    };
+    // notional * diff / entry — diff is signed, so the product is signed.
+    (notional * diff) / entry
+}
+
+/// Funding owed by a position since it last settled. Positive means the position
+/// *pays* (longs pay when the cumulative index rises). 7-dp USDC.
+///
+/// `cum_now`/`cum_entry` are 18-dp cumulative funding indices. For a long the
+/// payment is `notional * (cum_now - cum_entry) / 1e18`; a short pays the negation
+/// (i.e. receives when longs pay).
+pub fn funding_payment(notional: i128, cum_now: i128, cum_entry: i128, side: Side) -> i128 {
+    let raw = (notional * (cum_now - cum_entry)) / FUNDING_SCALE;
+    match side {
+        Side::Long => raw,
+        Side::Short => -raw,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pnl_long_and_short_are_symmetric() {
+        // $1000 notional, entry 100.0, mark 110.0 (7-dp) => +10% => +$100 long.
+        let notional = 1_000 * PRICE_SCALE;
+        let entry = 100 * PRICE_SCALE;
+        let mark = 110 * PRICE_SCALE;
+        assert_eq!(
+            position_pnl(notional, entry, mark, Side::Long),
+            100 * PRICE_SCALE
+        );
+        assert_eq!(
+            position_pnl(notional, entry, mark, Side::Short),
+            -100 * PRICE_SCALE
+        );
+    }
+
+    #[test]
+    fn funding_sign_convention() {
+        let notional = 1_000 * PRICE_SCALE;
+        // cumulative index moved +0.001 (1e15 of 1e18) => long pays 0.1% of notional.
+        let cum_now = FUNDING_SCALE / 1000;
+        assert_eq!(
+            funding_payment(notional, cum_now, 0, Side::Long),
+            notional / 1000
+        );
+        assert_eq!(
+            funding_payment(notional, cum_now, 0, Side::Short),
+            -(notional / 1000)
+        );
+    }
+
+    #[test]
+    fn bps_helper() {
+        let notional = 1_000 * PRICE_SCALE;
+        assert_eq!(apply_bps(notional, 10), notional / 1000); // 0.10%
+    }
+}

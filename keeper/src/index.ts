@@ -38,3 +38,43 @@ async function main(): Promise<void> {
 
   const config = loadConfig();
   log.info("helix keeper starting", redactedConfig(config));
+
+  const client = new StellarClient(config);
+  const indexer = new Indexer(client, config);
+  indexer.load();
+  const keeper = new Keeper(client, indexer, config);
+
+  const runOnce = process.argv.slice(2).includes("once");
+
+  if (runOnce) {
+    log.info("running single cycle (once mode)");
+    await keeper.runCycle();
+    indexer.save();
+    log.info("once mode complete");
+    return;
+  }
+
+  await runLoop(keeper, indexer, config.pollIntervalMs);
+}
+
+async function runLoop(keeper: Keeper, indexer: Indexer, intervalMs: number): Promise<void> {
+  let stopping = false;
+  let cycleInFlight = false;
+  let timer: NodeJS.Timeout | undefined;
+  let resolveDone: (() => void) | undefined;
+  const done = new Promise<void>((resolve) => {
+    resolveDone = resolve;
+  });
+
+  const finish = (): void => {
+    if (resolveDone) {
+      resolveDone();
+      resolveDone = undefined;
+    }
+  };
+
+  const shutdown = (signal: string): void => {
+    if (stopping) return;
+    stopping = true;
+    log.info("shutdown requested", { signal });
+    if (timer !== undefined) {

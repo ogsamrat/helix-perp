@@ -84,3 +84,47 @@ export const log = {
   warn: (message: string, context?: LogContext): void => emit("warn", message, context),
   error: (message: string, context?: LogContext): void => emit("error", message, context),
 };
+
+/**
+ * Error sink. The default implementation logs through the structured logger.
+ * Swap it (e.g. for Sentry) via {@link setErrorSink} without changing callers.
+ */
+export type ErrorSink = (err: unknown, context: LogContext) => void;
+
+const defaultSink: ErrorSink = (err, context) => {
+  log.error("captured_error", { ...context, error: serializeError(err) });
+};
+
+let errorSink: ErrorSink = defaultSink;
+
+export function setErrorSink(sink: ErrorSink): void {
+  errorSink = sink;
+}
+
+/**
+ * Single funnel for reporting errors. Never throws — safe to call from catch
+ * blocks and loop bodies.
+ */
+export function captureError(err: unknown, context: LogContext = {}): void {
+  try {
+    errorSink(err, context);
+  } catch (sinkErr) {
+    // Last-ditch fallback if the sink itself blows up.
+    try {
+      process.stderr.write(
+        JSON.stringify(
+          {
+            ts: new Date().toISOString(),
+            level: "error",
+            msg: "error_sink_failed",
+            sinkError: serializeError(sinkErr),
+            originalError: serializeError(err),
+          },
+          replacer,
+        ) + "\n",
+      );
+    } catch {
+      // Give up silently; we must not crash the keeper from the logger.
+    }
+  }
+}

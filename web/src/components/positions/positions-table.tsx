@@ -83,3 +83,46 @@ function PositionRow({ p }: { p: PositionView }) {
         <div>
           <div className="font-medium text-ink">{meta.ticker}</div>
           <Badge variant={p.side === "Long" ? "long" : "short"}>{p.side}</Badge>
+        </div>
+      </div>
+      <Cell label="Size" className="md:col-span-2">
+        <span className="tnum text-ink">{fmtUsd(p.notional)}</span>
+      </Cell>
+      <Cell label="Entry / Mark" className="md:col-span-2">
+        <div className="tnum text-ink">{fmtPrice(p.entryPrice, meta.priceDecimals)}</div>
+        <div className="tnum text-2xs text-ink-faint">{fmtPrice(toScaled(liveMark), meta.priceDecimals)}</div>
+      </Cell>
+      <Cell label="PnL" className="md:col-span-2">
+        <Signed positive={netUnits >= 0}>{fmtSignedUsd(toScaled(netUnits))}</Signed>
+        <div className="tnum text-2xs">
+          <Signed positive={netUnits >= 0}>
+            {pnlPct >= 0 ? "+" : ""}
+            {pnlPct.toFixed(2)}%
+          </Signed>
+        </div>
+      </Cell>
+      <Cell label="Liq. / Margin" className="md:col-span-2">
+        <div className="tnum text-warn">{fmtPrice(p.liquidationPrice, meta.priceDecimals)}</div>
+        <div className={cn("tnum text-2xs", `text-${health}`)}>{(ratioBps / 100).toFixed(2)}% ratio</div>
+      </Cell>
+      <div className="col-span-2 flex items-center justify-end gap-1.5">
+        <Button size="sm" variant="ghost" onClick={() => setManage(true)} aria-label="Manage">
+          <Settings2 className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="sm" variant="secondary" loading={action.isPending} onClick={close}>
+          Close
+        </Button>
+      </div>
+      <ManageDialog position={p} meta={meta} open={manage} onClose={() => setManage(false)} />
+    </div>
+  );
+}
+
+function Cell({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("text-right", className)}>
+      <div className="text-2xs uppercase tracking-wide text-ink-faint md:hidden">{label}</div>
+      {children}
+    </div>
+  );
+}

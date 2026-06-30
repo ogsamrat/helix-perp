@@ -562,3 +562,286 @@ impl PerpEngine {
             id: pos.id,
             market_id: pos.market_id,
             mark_price: price.price,
+            trader_payout,
+            keeper_fee,
+        }
+        .publish(e);
+    }
+
+    /// Keeper: advance a market's funding index based on open-interest skew.
+    pub fn update_funding(e: &Env, keeper: Address, market_id: u32) -> i128 {
+        keeper.require_auth();
+        if !Self::registry(e).is_keeper(&keeper) {
+            panic_with_error!(e, EngineError::NotKeeper);
+        }
+        let cfg = Self::market(e, market_id);
+        let index = Self::price(e, &cfg);
+
+        let long = Self::oi(e, market_id, Side::Long);
+        let short = Self::oi(e, market_id, Side::Short);
+        let total = long + short;
+        // Skew-driven funding rate, naturally bounded to ±max_funding_rate_bps.
+        let rate_bps = if total == 0 {
+            0
+        } else {
+            (long - short) * (cfg.max_funding_rate_bps as i128) / total
+        };
+        // bps -> 1e18 fraction.
+        let rate_frac = rate_bps * (FUNDING_SCALE / BPS_DENOM);
+        let cum = Self::cum_funding(e, market_id) + rate_frac;
+        e.storage()
+            .persistent()
+            .set(&DataKey::CumFunding(market_id), &cum);
+        e.storage()
+            .persistent()
+            .set(&DataKey::LastFundingTs(market_id), &e.ledger().timestamp());
+        e.storage().persistent().extend_ttl(
+            &DataKey::CumFunding(market_id),
+            BUMP_THRESHOLD,
+            BUMP_AMOUNT,
+        );
+        Self::bump(e);
+
+        FundingUpdated {
+            market_id,
+            rate_bps,
+            cumulative: cum,
+            index_price: index.price,
+            timestamp: e.ledger().timestamp(),
+        }
+        .publish(e);
+        rate_bps
+    }
+
+    // ------------------------------------------------------------------ views
+
+    pub fn get_position(e: &Env, id: u64) -> Position {
+        Self::position(e, id)
+    }
+
+    pub fn user_position_ids(e: &Env, user: Address) -> Vec<u64> {
+        e.storage()
+            .persistent()
+            .get(&DataKey::UserPositions(user))
+            .unwrap_or(Vec::new(e))
+    }
+
+    /// All open positions for a user, each as a fully-computed [`PositionView`].
+    pub fn user_positions(e: &Env, user: Address) -> Vec<PositionView> {
+        let ids = Self::user_position_ids(e, user);
+        let mut out = Vec::new(e);
+        for id in ids.iter() {
+            if let Some(p) = e
+                .storage()
+                .persistent()
+                .get::<_, Position>(&DataKey::Position(id))
+            {
+                out.push_back(Self::view_of(e, &p));
+            }
+        }
+        out
+    }
+
+    /// Computed snapshot of a single position (PnL, equity, liq price, …).
+    pub fn position_view(e: &Env, id: u64) -> PositionView {
+        let p = Self::position(e, id);
+        Self::view_of(e, &p)
+    }
+
+    pub fn long_oi(e: &Env, market_id: u32) -> i128 {
+        Self::oi(e, market_id, Side::Long)
+    }
+    pub fn short_oi(e: &Env, market_id: u32) -> i128 {
+        Self::oi(e, market_id, Side::Short)
+    }
+    pub fn cumulative_funding(e: &Env, market_id: u32) -> i128 {
+        Self::cum_funding(e, market_id)
+    }
+    pub fn last_funding_ts(e: &Env, market_id: u32) -> u64 {
+        e.storage()
+            .persistent()
+            .get(&DataKey::LastFundingTs(market_id))
+            .unwrap_or(0)
+    }
+    pub fn registry_address(e: &Env) -> Address {
+        e.storage().instance().get(&DataKey::Registry).unwrap()
+    }
+    pub fn oracle_address(e: &Env) -> Address {
+        e.storage().instance().get(&DataKey::Oracle).unwrap()
+    }
+    pub fn vault_address(e: &Env) -> Address {
+        e.storage().instance().get(&DataKey::Vault).unwrap()
+    }
+
+    // -------------------------------------------------------------- internals
+
+    fn view_of(e: &Env, p: &Position) -> PositionView {
+        let cfg = Self::market(e, p.market_id);
+        let mark = Self::price(e, &cfg).price;
+        let pnl = position_pnl(p.notional, p.entry_price, mark, p.side);
+        let funding = funding_payment(
+            p.notional,
+            Self::cum_funding(e, p.market_id),
+            p.entry_funding,
+            p.side,
+        );
+        let equity = p.margin + pnl - funding;
+        let maintenance = apply_bps(p.notional, cfg.mmr_bps);
+        // Solve equity == maintenance for price.
+        let signed = maintenance - p.margin + funding; // usually negative
+        let delta_px = p.entry_price * signed / p.notional;
+        let liq = match p.side {
+            Side::Long => p.entry_price + delta_px,
+            Side::Short => p.entry_price - delta_px,
+        };
+        PositionView {
+            id: p.id,
+            owner: p.owner.clone(),
+            market_id: p.market_id,
+            side: p.side,
+            margin: p.margin,
+            notional: p.notional,
+            entry_price: p.entry_price,
+            mark_price: mark,
+            unrealized_pnl: pnl,
+            funding,
+            equity,
+            maintenance_margin: maintenance,
+            liquidation_price: liq.max(0),
+            leverage_bps: if p.margin > 0 {
+                p.notional * BPS_DENOM / p.margin
+            } else {
+                0
+            },
+            margin_ratio_bps: if p.notional > 0 {
+                equity * BPS_DENOM / p.notional
+            } else {
+                0
+            },
+        }
+    }
+
+    fn ensure_active(e: &Env, cfg: &MarketConfig) {
+        if Self::registry(e).is_paused() {
+            panic_with_error!(e, EngineError::GlobalPaused);
+        }
+        if cfg.paused {
+            panic_with_error!(e, EngineError::MarketPaused);
+        }
+    }
+
+    fn check_slippage(e: &Env, mark: i128, ref_price: i128, max_slippage_bps: u32) {
+        if ref_price <= 0 {
+            return;
+        }
+        let diff = (mark - ref_price).abs();
+        if diff * BPS_DENOM / ref_price > max_slippage_bps as i128 {
+            panic_with_error!(e, EngineError::SlippageExceeded);
+        }
+    }
+
+    fn registry(e: &Env) -> RegistryClient<'static> {
+        RegistryClient::new(e, &Self::registry_address(e))
+    }
+    fn oracle(e: &Env) -> OracleClient<'static> {
+        OracleClient::new(e, &Self::oracle_address(e))
+    }
+    fn vault(e: &Env) -> VaultClient<'static> {
+        VaultClient::new(e, &Self::vault_address(e))
+    }
+
+    fn market(e: &Env, id: u32) -> MarketConfig {
+        Self::registry(e).get_market(&id)
+    }
+    fn price(e: &Env, cfg: &MarketConfig) -> OraclePrice {
+        Self::oracle(e).get_price(&cfg.feed)
+    }
+
+    fn next_id(e: &Env) -> u64 {
+        let id: u64 = e.storage().instance().get(&DataKey::NextId).unwrap_or(0);
+        e.storage().instance().set(&DataKey::NextId, &(id + 1));
+        id
+    }
+
+    fn position(e: &Env, id: u64) -> Position {
+        e.storage()
+            .persistent()
+            .get(&DataKey::Position(id))
+            .unwrap_or_else(|| panic_with_error!(e, EngineError::PositionNotFound))
+    }
+
+    fn owned_position(e: &Env, trader: &Address, id: u64) -> Position {
+        let pos = Self::position(e, id);
+        trader.require_auth();
+        if &pos.owner != trader {
+            panic_with_error!(e, EngineError::NotOwner);
+        }
+        pos
+    }
+
+    fn store_position(e: &Env, pos: &Position) {
+        let key = DataKey::Position(pos.id);
+        e.storage().persistent().set(&key, pos);
+        e.storage()
+            .persistent()
+            .extend_ttl(&key, BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+
+    fn remove_position(e: &Env, pos: &Position) {
+        e.storage().persistent().remove(&DataKey::Position(pos.id));
+        let key = DataKey::UserPositions(pos.owner.clone());
+        let ids: Vec<u64> = e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
+        let mut next = Vec::new(e);
+        for id in ids.iter() {
+            if id != pos.id {
+                next.push_back(id);
+            }
+        }
+        e.storage().persistent().set(&key, &next);
+    }
+
+    fn add_user_position(e: &Env, user: &Address, id: u64) {
+        let key = DataKey::UserPositions(user.clone());
+        let mut ids: Vec<u64> = e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
+        ids.push_back(id);
+        e.storage().persistent().set(&key, &ids);
+        e.storage()
+            .persistent()
+            .extend_ttl(&key, BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+
+    fn cum_funding(e: &Env, market_id: u32) -> i128 {
+        e.storage()
+            .persistent()
+            .get(&DataKey::CumFunding(market_id))
+            .unwrap_or(0)
+    }
+
+    fn oi(e: &Env, market_id: u32, side: Side) -> i128 {
+        let key = match side {
+            Side::Long => DataKey::LongOi(market_id),
+            Side::Short => DataKey::ShortOi(market_id),
+        };
+        e.storage().persistent().get(&key).unwrap_or(0)
+    }
+
+    fn set_oi(e: &Env, market_id: u32, side: Side, value: i128) {
+        let key = match side {
+            Side::Long => DataKey::LongOi(market_id),
+            Side::Short => DataKey::ShortOi(market_id),
+        };
+        e.storage().persistent().set(&key, &value);
+        e.storage()
+            .persistent()
+            .extend_ttl(&key, BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+
+    fn bump(e: &Env) {
+        e.storage()
+            .instance()
+            .extend_ttl(BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+}
+
+#[cfg(test)]
+mod test;

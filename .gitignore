@@ -1,0 +1,45 @@
+# Rust / Soroban
+/target
+**/target
+Cargo.lock.bak
+.soroban
+.stellar/identity
+*.optimized.wasm
+
+# Node / Next.js
+node_modules
+.pnp
+.pnp.js
+.next
+out
+build
+dist
+.turbo
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+coverage
+.swc
+
+# Env / secrets
+.env
+.env.local
+.env*.local
+*.key
+.stellar-keys
+deploy-output.json
+.deployed.json
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Keeper
+keeper/.env
+keeper/state.json

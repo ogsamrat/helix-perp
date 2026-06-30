@@ -180,3 +180,94 @@ impl OracleAdapter {
             .get::<_, OraclePrice>(&DataKey::Last(feed.clone()))
         {
             let diff = (price - last.price).abs();
+            let dev_bps = diff * BPS_DENOM / last.price;
+            if dev_bps > max_dev as i128 {
+                panic_with_error!(e, OracleError::PriceDeviationTooHigh);
+            }
+        }
+
+        let out = OraclePrice {
+            price,
+            timestamp: raw.timestamp,
+        };
+        e.storage()
+            .persistent()
+            .set(&DataKey::Last(feed.clone()), &out);
+        e.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Last(feed), BUMP_THRESHOLD, BUMP_AMOUNT);
+        Self::bump_instance(e);
+        out
+    }
+
+    // ---- views ----
+
+    /// Last accepted normalised price for `feed`, if any.
+    pub fn last_price(e: &Env, feed: Symbol) -> Option<OraclePrice> {
+        e.storage().persistent().get(&DataKey::Last(feed))
+    }
+
+    /// The Reflector asset mapped to `feed`, if any.
+    pub fn feed_asset(e: &Env, feed: Symbol) -> Option<ReflectorAsset> {
+        e.storage().persistent().get(&DataKey::Feed(feed))
+    }
+
+    pub fn reflector(e: &Env) -> Address {
+        e.storage().instance().get(&DataKey::Reflector).unwrap()
+    }
+
+    pub fn max_age(e: &Env) -> u64 {
+        e.storage().instance().get(&DataKey::MaxAge).unwrap()
+    }
+
+    pub fn max_deviation_bps(e: &Env) -> u32 {
+        e.storage()
+            .instance()
+            .get(&DataKey::MaxDeviationBps)
+            .unwrap()
+    }
+
+    pub fn oracle_decimals(e: &Env) -> u32 {
+        e.storage()
+            .instance()
+            .get(&DataKey::OracleDecimals)
+            .unwrap()
+    }
+
+    // ---- internals ----
+
+    fn admin(e: &Env) -> Address {
+        e.storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("admin not set")
+    }
+
+    /// Convert an upstream price at `OracleDecimals` precision to 7 dp.
+    fn normalize(e: &Env, raw: i128) -> i128 {
+        let dec: u32 = e
+            .storage()
+            .instance()
+            .get(&DataKey::OracleDecimals)
+            .unwrap();
+        if dec >= 7 {
+            let factor = 10i128.pow(dec - 7);
+            raw / factor
+        } else {
+            let factor = 10i128.pow(7 - dec);
+            raw * factor
+        }
+    }
+
+    fn bump_instance(e: &Env) {
+        e.storage()
+            .instance()
+            .extend_ttl(BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+}
+
+/// Re-exported constant for callers/tests that want the normalised scale.
+pub const NORMALIZED_SCALE: i128 = PRICE_SCALE;
+
+#[cfg(test)]
+mod test;

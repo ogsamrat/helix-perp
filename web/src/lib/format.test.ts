@@ -12,3 +12,18 @@ describe("format", () => {
     expect(fmtSignedUsd(toScaled(-88.4))).toBe("-$88.40");
   });
 
+  it("derives leverage from bps", () => {
+    expect(fmtLeverage(100_000)).toBe("10.0x");
+    expect(fmtLeverage(25_000)).toBe("2.5x");
+  });
+
+  it("round-trips whole units through 7-dp scaling", () => {
+    expect(toUnits(toScaled(42.42))).toBeCloseTo(42.42, 6);
+    expect(toScaled(1)).toBe(10_000_000n);
+  });
+
+  it("formats basis points as percent", () => {
+    expect(fmtBps(50)).toBe("0.50%");
+    expect(fmtBps(250)).toBe("2.50%");
+  });
+});

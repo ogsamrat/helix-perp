@@ -30,3 +30,36 @@ export function GetFundsButton({
   const onClick = async () => {
     if (!address) {
       await connect();
+      return;
+    }
+    setBusy(true);
+    try {
+      if (!(await accountExists(address))) {
+        const id = toast.push({
+          title: "Activating account",
+          description: "Friendbot is creating your testnet account…",
+          variant: "loading",
+        });
+        await fundWithFriendbot(address);
+        toast.update(id, { title: "Account funded", description: "Minting test USDC…", variant: "success", duration: 3000 });
+        setTimeout(() => toast.dismiss(id), 3000);
+      }
+      await action.mutateAsync({ call: calls.faucet(address, toScaled(amount)) });
+    } catch (e) {
+      toast.push({
+        title: "Couldn't get funds",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "error",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button variant={variant} size={size} className={className} loading={busy || action.isPending} onClick={onClick}>
+      <Coins className="h-4 w-4" />
+      {label}
+    </Button>
+  );
+}

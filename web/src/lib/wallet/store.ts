@@ -45,3 +45,50 @@ export const useWallet = create<WalletState>((set, get) => ({
       const k = getKit();
       await k.openModal({
         onWalletSelected: async (option) => {
+          k.setWallet(option.id);
+          const { address } = await k.getAddress();
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: option.id, address }));
+          }
+          set({ address, walletId: option.id });
+        },
+        onClosed: () => set({ connecting: false }),
+      });
+    } finally {
+      set({ connecting: false });
+    }
+  },
+
+  disconnect: () => {
+    if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY);
+    try {
+      getKit().disconnect?.();
+    } catch {
+      /* noop */
+    }
+    set({ address: null, walletId: null });
+  },
+
+  restore: async () => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    try {
+      const { id, address } = JSON.parse(saved) as { id: string; address: string };
+      getKit().setWallet(id);
+      set({ address, walletId: id });
+    } catch {
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
+  },
+
+  sign: async (xdr, opts) => {
+    const k = getKit();
+    const { address } = get();
+    const res = await k.signTransaction(xdr, {
+      address: opts.address ?? address ?? undefined,
+      networkPassphrase: opts.networkPassphrase,
+    });
+    return { signedTxXdr: res.signedTxXdr };
+  },
+}));

@@ -1,0 +1,25 @@
+{
+  "name": "helix-keeper",
+  "version": "1.0.0",
+  "description": "Off-chain keeper bot for the Helix Soroban perpetual-futures protocol: funding updates, liquidation scanning, and optional oracle price simulation on Stellar testnet.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "once": "tsx src/index.ts once",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^16.0.1",
+    "dotenv": "^17.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.3"
+  }
+}

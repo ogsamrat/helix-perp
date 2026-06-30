@@ -128,3 +128,68 @@ export async function getVaultShares(owner: string): Promise<bigint> {
 }
 
 export async function getUsdcBalance(owner: string): Promise<bigint> {
+  const v = await readContract<bigint>(C.mockUsdc, "balance", [arg.addr(owner)]);
+  return BigInt(v ?? 0n);
+}
+
+// ----------------------------------------------------------- call builders (writes)
+export const calls = {
+  faucet: (to: string, amount: bigint): Call => ({
+    contractId: C.mockUsdc,
+    method: "faucet",
+    args: [arg.addr(to), arg.i128(amount)],
+    label: "Get test USDC",
+  }),
+  openPosition: (
+    trader: string,
+    marketId: number,
+    side: Side,
+    margin: bigint,
+    notional: bigint,
+    refPrice: bigint,
+    slippageBps: number,
+  ): Call => ({
+    contractId: C.perpEngine,
+    method: "open_position",
+    args: [
+      arg.addr(trader),
+      arg.u32(marketId),
+      arg.side(side),
+      arg.i128(margin),
+      arg.i128(notional),
+      arg.i128(refPrice),
+      arg.u32(slippageBps),
+    ],
+    label: `Open ${side} ${marketId}`,
+  }),
+  closePosition: (trader: string, id: bigint): Call => ({
+    contractId: C.perpEngine,
+    method: "close_position",
+    args: [arg.addr(trader), arg.u64(id)],
+    label: "Close position",
+  }),
+  addMargin: (trader: string, id: bigint, amount: bigint): Call => ({
+    contractId: C.perpEngine,
+    method: "add_margin",
+    args: [arg.addr(trader), arg.u64(id), arg.i128(amount)],
+    label: "Add margin",
+  }),
+  removeMargin: (trader: string, id: bigint, amount: bigint): Call => ({
+    contractId: C.perpEngine,
+    method: "remove_margin",
+    args: [arg.addr(trader), arg.u64(id), arg.i128(amount)],
+    label: "Remove margin",
+  }),
+  addLiquidity: (from: string, amount: bigint): Call => ({
+    contractId: C.collateralVault,
+    method: "add_liquidity",
+    args: [arg.addr(from), arg.i128(amount)],
+    label: "Add liquidity",
+  }),
+  removeLiquidity: (from: string, shares: bigint): Call => ({
+    contractId: C.collateralVault,
+    method: "remove_liquidity",
+    args: [arg.addr(from), arg.i128(shares)],
+    label: "Remove liquidity",
+  }),
+};

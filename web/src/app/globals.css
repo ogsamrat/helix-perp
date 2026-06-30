@@ -92,4 +92,45 @@
   .hairline-b {
     border-bottom: 1px solid rgb(var(--hairline));
   }
+
+  /* Editorial display serif — used sparingly for headlines + hero numerals. */
+  .font-display {
+    font-family: var(--font-display), Georgia, "Times New Roman", serif;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+  }
+  /* Mono, uppercase, widely tracked — the small label that frames editorial type. */
+  .eyebrow {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    font-size: 0.6875rem;
+    line-height: 1;
+    color: rgb(var(--ink-faint));
+  }
+  /* A 1px highlight along a surface's top edge — quiet, expensive depth. */
+  .sheen {
+    position: relative;
+  }
+  .sheen::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--ink) / 0.08) 18%,
+      rgb(var(--ink) / 0.08) 82%,
+      transparent
+    );
+  }
+  .accent-rule {
+    height: 1px;
+    background: linear-gradient(90deg, rgb(var(--brand) / 0.5), transparent);
+  }
+  .mask-fade-r {
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+    mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+  }
 }

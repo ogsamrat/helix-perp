@@ -30,6 +30,7 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        display: ["var(--font-display)", "Georgia", "serif"],
       },
       fontSize: {
         "2xs": ["0.6875rem", { lineHeight: "0.875rem", letterSpacing: "0.02em" }],
@@ -54,6 +55,11 @@ const config: Config = {
         "flash-short": { "0%": { color: "rgb(var(--short))" }, "100%": {} },
         shimmer: { "100%": { transform: "translateX(100%)" } },
         "pulse-soft": { "0%,100%": { opacity: "1" }, "50%": { opacity: "0.45" } },
+        marquee: { from: { transform: "translateX(0)" }, to: { transform: "translateX(-50%)" } },
+        "reveal-up": {
+          from: { opacity: "0", transform: "translateY(14px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.25s ease-out",
@@ -62,6 +68,8 @@ const config: Config = {
         "flash-short": "flash-short 0.6s ease-out",
         shimmer: "shimmer 1.6s infinite",
         "pulse-soft": "pulse-soft 1.8s ease-in-out infinite",
+        marquee: "marquee 38s linear infinite",
+        "reveal-up": "reveal-up 0.7s cubic-bezier(0.16,1,0.3,1) both",
       },
     },
   },

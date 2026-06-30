@@ -23,3 +23,29 @@ export const useLivePriceStore = create<LivePriceState>((set) => ({
       if (!(price > 0)) return s;
       const anchors = { ...s.anchors, [feed]: price };
       const live = { ...s.live };
+      if (live[feed] === undefined) live[feed] = price;
+      return { anchors, live };
+    }),
+  step: () =>
+    set((s) => {
+      if (Object.keys(s.anchors).length === 0) return s;
+      const live = { ...s.live };
+      for (const feed of Object.keys(s.anchors)) {
+        const a = s.anchors[feed];
+        const cur = live[feed] ?? a;
+        const noise = a * (Math.random() - 0.5) * 0.0018; // ~0.09% jitter
+        let next = cur + (a - cur) * 0.025 + noise; // gentle pull toward anchor
+        next = Math.min(Math.max(next, a * 0.975), a * 1.025); // clamp +/-2.5%
+        live[feed] = next;
+      }
+      return { live };
+    }),
+}));
+
+export function useLiveMap() {
+  return useLivePriceStore((s) => s.live);
+}
+
+export function useLivePrice(feed: string) {
+  return useLivePriceStore((s) => s.live[feed] ?? s.anchors[feed] ?? 0);
+}

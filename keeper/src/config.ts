@@ -130,3 +130,70 @@ export function loadConfig(): KeeperConfig {
   }
 
   let keeperPublicKey: string;
+  try {
+    keeperPublicKey = Keypair.fromSecret(keeperSecret).publicKey();
+  } catch (err) {
+    throw new Error(
+      `KEEPER_SECRET is not a valid Stellar secret seed: ${(err as Error).message}`,
+    );
+  }
+
+  const config: KeeperConfig = {
+    keeperSecret,
+    keeperPublicKey,
+    rpcUrl: (env.RPC_URL ?? DEFAULT_RPC_URL).trim(),
+    networkPassphrase: (env.NETWORK_PASSPHRASE ?? DEFAULT_NETWORK_PASSPHRASE).trim(),
+    perpEngineId: pickContractId(
+      env.PERP_ENGINE_ID,
+      deploy?.perp_engine,
+      FALLBACK_CONTRACTS.perpEngineId,
+      "PERP_ENGINE_ID",
+    ),
+    marketRegistryId: pickContractId(
+      env.MARKET_REGISTRY_ID,
+      deploy?.market_registry,
+      FALLBACK_CONTRACTS.marketRegistryId,
+      "MARKET_REGISTRY_ID",
+    ),
+    mockOracleId: pickContractId(
+      env.MOCK_ORACLE_ID,
+      deploy?.mock_oracle,
+      FALLBACK_CONTRACTS.mockOracleId,
+      "MOCK_ORACLE_ID",
+    ),
+    oracleAdapterId: pickContractId(
+      env.ORACLE_ADAPTER_ID,
+      deploy?.oracle_adapter,
+      FALLBACK_CONTRACTS.oracleAdapterId,
+      "ORACLE_ADAPTER_ID",
+    ),
+    pollIntervalMs: parsePositiveInt(env.POLL_INTERVAL_MS, DEFAULT_POLL_INTERVAL_MS, "POLL_INTERVAL_MS"),
+    simulatePrices: parseBool(env.SIMULATE_PRICES, false),
+    eventLookbackLedgers: parsePositiveInt(
+      env.EVENT_LOOKBACK_LEDGERS,
+      DEFAULT_EVENT_LOOKBACK_LEDGERS,
+      "EVENT_LOOKBACK_LEDGERS",
+    ),
+    statePath: resolve(__dirname, "..", "state.json"),
+  };
+
+  cached = config;
+  return config;
+}
+
+/** Redacted view of config that is safe to log (no secret). */
+export function redactedConfig(c: KeeperConfig): Record<string, unknown> {
+  return {
+    keeperPublicKey: c.keeperPublicKey,
+    rpcUrl: c.rpcUrl,
+    networkPassphrase: c.networkPassphrase,
+    perpEngineId: c.perpEngineId,
+    marketRegistryId: c.marketRegistryId,
+    mockOracleId: c.mockOracleId,
+    oracleAdapterId: c.oracleAdapterId,
+    pollIntervalMs: c.pollIntervalMs,
+    simulatePrices: c.simulatePrices,
+    eventLookbackLedgers: c.eventLookbackLedgers,
+    statePath: c.statePath,
+  };
+}

@@ -39,3 +39,44 @@ impl MockOracle {
     }
 
     /// Admin: set a feed price with an explicit timestamp — used to simulate
+    /// stale data in tests and demos.
+    pub fn set_price_at(e: &Env, asset: ReflectorAsset, price: i128, timestamp: u64) {
+        Self::admin(e).require_auth();
+        Self::store(e, asset, price, timestamp);
+    }
+
+    // ---- Reflector interface (read side) ----
+
+    /// Latest price record for `asset`, or `None` if unset.
+    pub fn lastprice(e: &Env, asset: ReflectorAsset) -> Option<ReflectorPriceData> {
+        e.storage().persistent().get(&DataKey::Price(asset))
+    }
+
+    /// Native precision of returned prices.
+    pub fn decimals(e: &Env) -> u32 {
+        e.storage().instance().get(&DataKey::Decimals).unwrap_or(14)
+    }
+
+    fn admin(e: &Env) -> Address {
+        e.storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("admin not set")
+    }
+
+    fn store(e: &Env, asset: ReflectorAsset, price: i128, timestamp: u64) {
+        let key = DataKey::Price(asset);
+        e.storage()
+            .persistent()
+            .set(&key, &ReflectorPriceData { price, timestamp });
+        e.storage()
+            .persistent()
+            .extend_ttl(&key, BUMP_THRESHOLD, BUMP_AMOUNT);
+        e.storage()
+            .instance()
+            .extend_ttl(BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+}
+
+#[cfg(test)]
+mod test;

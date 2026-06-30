@@ -59,3 +59,64 @@ export default function Landing() {
             <span className="h-1.5 w-1.5 rounded-full bg-long" /> Live on Stellar {CONFIG.network} · Soroban
           </Badge>
           <h1 className="max-w-3xl text-balance text-5xl font-semibold leading-[1.05] tracking-tight text-ink md:text-7xl">
+            Leverage the <span className="text-brand">real world.</span>
+          </h1>
+          <p className="mt-5 max-w-xl text-balance text-lg text-ink-muted">
+            Helix is a decentralized perpetual-futures exchange for gold, FX and crypto — margined and
+            settled in on-chain USDC. The only chain whose whole thesis is real-world assets.
+          </p>
+          <div className="mt-7 flex flex-wrap items-center gap-3">
+            <Link href="/trade">
+              <Button variant="primary" size="lg">
+                Start trading <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <GetFundsButton variant="secondary" size="lg" label="Get test funds" />
+          </div>
+
+          {/* live ticker */}
+          <div className="mt-12 grid max-w-3xl grid-cols-1 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline sm:grid-cols-3">
+            {MARKETS.map((m) => (
+              <Link key={m.id} href="/trade" className="group bg-surface p-4 transition-colors hover:bg-elevated">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-ink">{m.ticker}</span>
+                  <Badge variant="outline">{m.kind}</Badge>
+                </div>
+                <div className="tnum mt-2 text-2xl font-semibold">{px(m.feed, m.priceDecimals)}</div>
+                <div className="mt-1 text-2xs text-ink-faint">{m.name} · up to {marketLev(m.id)}x</div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* stat band */}
+      <section className="border-y border-hairline bg-surface/40">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px bg-hairline md:grid-cols-4">
+          <Stat label="Vault TVL" value={vault.data ? fmtCompactUsd(vault.data.lpCash) : "—"} />
+          <Stat label="Markets" value={`${MARKETS.length}`} />
+          <Stat label="Max leverage" value="25x" />
+          <Stat label="Settlement" value="USDC" />
+        </div>
+      </section>
+
+      {/* why stellar */}
+      <section className="mx-auto max-w-6xl px-5 py-20">
+        <h2 className="text-balance text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+          A perp DEX that could only live on Stellar
+        </h2>
+        <p className="mt-3 max-w-2xl text-ink-muted">
+          Stellar was built for FX, anchors, stablecoins and tokenized real-world assets. Helix turns that
+          foundation into leveraged, composable derivatives — entirely on-chain in Soroban.
+        </p>
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
+          <Feature icon={<Boxes className="h-5 w-5" />} title="4-contract protocol">
+            Isolated registry, vault, oracle adapter and engine with real cross-contract calls — custody is
+            separated from trading logic and upgradeable independently.
+          </Feature>
+          <Feature icon={<ShieldCheck className="h-5 w-5" />} title="Hardened oracle">
+            A swappable Reflector adapter rejects stale prices, bounds tick-to-tick deviation and refuses
+            non-positive prices — typed errors, not silent failures.
+          </Feature>
+          <Feature icon={<Lock className="h-5 w-5" />} title="Shared LP vault">
+            One USDC pool backs every position and earns fees + funding, with ERC-4626-style shares and

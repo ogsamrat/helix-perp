@@ -141,3 +141,75 @@ export class StellarClient {
    */
   async invoke(contractId: string, method: string, args: xdr.ScVal[]): Promise<string> {
     const source = await this.buildSourceAccount();
+    const contract = new Contract(contractId);
+    const built = new TransactionBuilder(source, {
+      fee: BASE_FEE,
+      networkPassphrase: this.networkPassphrase,
+    })
+      .addOperation(contract.call(method, ...args))
+      .setTimeout(TX_TIMEOUT_SECONDS)
+      .build();
+
+    // prepareTransaction simulates first; surface a clean error before signing.
+    let prepared;
+    try {
+      prepared = await this.server.prepareTransaction(built);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      throw new ContractCallError(`prepare failed for ${method}: ${raw}`, raw);
+    }
+
+    prepared.sign(this.keypair);
+
+    const sendResp = await this.server.sendTransaction(prepared);
+    if (sendResp.status === "ERROR") {
+      const raw = sendResp.errorResult
+        ? sendResp.errorResult.toXDR("base64")
+        : JSON.stringify(sendResp);
+      throw new ContractCallError(`sendTransaction ERROR for ${method}`, raw);
+    }
+    if (sendResp.status !== "PENDING") {
+      // DUPLICATE or TRY_AGAIN_LATER — treat as transient.
+      throw new ContractCallError(
+        `sendTransaction non-pending status "${sendResp.status}" for ${method}`,
+        sendResp.status,
+      );
+    }
+
+    return this.pollResult(sendResp.hash, method);
+  }
+
+  private async pollResult(hash: string, method: string): Promise<string> {
+    for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+      const got = await this.server.getTransaction(hash);
+      switch (got.status) {
+        case rpc.Api.GetTransactionStatus.SUCCESS:
+          log.debug("tx confirmed", { method, hash, ledger: got.ledger });
+          return hash;
+        case rpc.Api.GetTransactionStatus.FAILED: {
+          const raw = got.resultXdr ? got.resultXdr.toXDR("base64") : "unknown";
+          throw new ContractCallError(`transaction FAILED for ${method} (${hash})`, raw);
+        }
+        case rpc.Api.GetTransactionStatus.NOT_FOUND:
+        default:
+          await sleep(POLL_INTERVAL_MS);
+          break;
+      }
+    }
+    throw new ContractCallError(
+      `timed out waiting for ${method} (${hash}) to finalize`,
+      hash,
+    );
+  }
+
+  /** Fetch the keeper account so the builder has a fresh sequence number. */
+  private async buildSourceAccount(): Promise<Account> {
+    return this.server.getAccount(this.keypair.publicKey());
+  }
+
+  /** Current ledger sequence, used to anchor event-history lookback windows. */
+  async getLatestLedger(): Promise<number> {
+    const resp = await this.server.getLatestLedger();
+    return resp.sequence;
+  }
+}

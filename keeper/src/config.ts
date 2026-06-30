@@ -64,3 +64,69 @@ function readDeployArtifact(): DeployArtifact["contracts"] {
   // keeper/src -> repo root is ../../ ; deploy file lives at ../deploy/testnet.json
   // relative to the keeper dir, i.e. <repo>/deploy/testnet.json.
   const candidate = resolve(__dirname, "..", "..", "deploy", "testnet.json");
+  try {
+    const raw = readFileSync(candidate, "utf8");
+    const parsed = JSON.parse(raw) as DeployArtifact;
+    if (parsed.contracts) {
+      log.debug("loaded deploy artifact", { path: candidate });
+      return parsed.contracts;
+    }
+    return undefined;
+  } catch {
+    // Missing or unreadable artefact is fine; we fall back to env/defaults.
+    return undefined;
+  }
+}
+
+function pickContractId(
+  envValue: string | undefined,
+  deployValue: string | undefined,
+  fallback: string,
+  name: string,
+): string {
+  const value = (envValue ?? deployValue ?? fallback).trim();
+  if (!isValidContractId(value)) {
+    throw new Error(`Invalid contract id for ${name}: "${value}" (expected a C... strkey)`);
+  }
+  return value;
+}
+
+function isValidContractId(value: string): boolean {
+  return /^C[A-Z2-7]{55}$/.test(value);
+}
+
+function parseBool(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  return /^(1|true|yes|on)$/i.test(value.trim());
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number, name: string): number {
+  if (value === undefined || value.trim() === "") return fallback;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new Error(`${name} must be a positive integer, got "${value}"`);
+  }
+  return n;
+}
+
+let cached: KeeperConfig | undefined;
+
+/**
+ * Load + validate config. The result is memoised so repeated imports are cheap
+ * and validation runs exactly once.
+ */
+export function loadConfig(): KeeperConfig {
+  if (cached) return cached;
+
+  const env = process.env;
+  const deploy = readDeployArtifact();
+
+  const keeperSecret = (env.KEEPER_SECRET ?? "").trim();
+  if (keeperSecret === "") {
+    throw new Error(
+      "KEEPER_SECRET is required. Set it in the environment (e.g. `stellar keys show <name>`). " +
+        "Never commit it.",
+    );
+  }
+
+  let keeperPublicKey: string;

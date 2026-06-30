@@ -55,3 +55,61 @@ async function run(
     const res = await invokeContract({
       contractId: rec.call.contractId,
       method: rec.call.method,
+      args: rec.call.args,
+      publicKey: address,
+      sign,
+      onHash: (hash) => {
+        patch({ status: "pending", hash });
+        toast.update(toastId, { description: "Submitted — confirming…", href: explorerTx(hash), hrefLabel: "View" });
+      },
+    });
+    patch({ status: "confirmed", returnValue: res.returnValue });
+    toast.update(toastId, {
+      title: rec.label,
+      description: "Confirmed",
+      variant: "success",
+      duration: 5000,
+      href: explorerTx(res.hash),
+      hrefLabel: "View on explorer",
+    });
+    setTimeout(() => toast.dismiss(toastId), 5000);
+    onConfirmed?.(res);
+    return res;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    patch({ status: "failed", error: msg });
+    toast.update(toastId, { title: rec.label + " failed", description: msg, variant: "error", duration: 8000 });
+    setTimeout(() => toast.dismiss(toastId), 8000);
+    return null;
+  }
+}
+
+export const useTxStore = create<TxState>((set, get) => ({
+  txs: [],
+  submit: async (call, onConfirmed) => {
+    const rec: TxRecord = {
+      id: `tx${++seq}-${Date.now()}`,
+      label: call.label,
+      status: "signing",
+      createdAt: Date.now(),
+      call,
+    };
+    set((s) => ({ txs: [rec, ...s.txs].slice(0, 50) }));
+    return run(set, get, rec, onConfirmed);
+  },
+  retry: async (id) => {
+    const existing = get().txs.find((t) => t.id === id);
+    if (!existing) return;
+    const rec: TxRecord = {
+      ...existing,
+      id: `tx${++seq}-${Date.now()}`,
+      status: "signing",
+      error: undefined,
+      hash: undefined,
+      createdAt: Date.now(),
+    };
+    set((s) => ({ txs: [rec, ...s.txs].slice(0, 50) }));
+    await run(set, get, rec);
+  },
+  clear: () => set(() => ({ txs: [] })),
+}));

@@ -190,3 +190,100 @@ fn FUNDING_PER_BPS() -> i128 {
 }
 
 #[test]
+fn underwater_position_is_liquidated_by_keeper() {
+    let w = world();
+    let trader = w.funded_trader(101 * ONE);
+    let id = w.open_long(&trader, 100 * ONE, 1_000 * ONE); // entry 2400, mmr 2.5%
+
+    w.set_price(2_200); // equity ~ 100 - 83.3 = 16.7 < maintenance 25
+    let kbal = w.usdc.balance(&w.keeper);
+    w.engine.liquidate(&w.keeper, &id);
+
+    assert!(w.engine.try_get_position(&id).is_err());
+    assert_eq!(w.engine.long_oi(&MARKET), 0);
+    // keeper earns the liquidation penalty (1% of $1000 = $10, capped by equity).
+    assert_eq!(w.usdc.balance(&w.keeper), kbal + 10 * ONE);
+}
+
+#[test]
+fn healthy_position_cannot_be_liquidated() {
+    let w = world();
+    let trader = w.funded_trader(101 * ONE);
+    let id = w.open_long(&trader, 100 * ONE, 1_000 * ONE);
+    assert_eq!(
+        w.engine.try_liquidate(&w.keeper, &id),
+        Err(Ok(EngineError::NotLiquidatable.into()))
+    );
+}
+
+#[test]
+fn rbac_only_keeper_can_liquidate_or_fund() {
+    let w = world();
+    let trader = w.funded_trader(101 * ONE);
+    let id = w.open_long(&trader, 100 * ONE, 1_000 * ONE);
+    w.set_price(2_200);
+    let intruder = Address::generate(&w.e);
+    assert_eq!(
+        w.engine.try_liquidate(&intruder, &id),
+        Err(Ok(EngineError::NotKeeper.into()))
+    );
+    assert_eq!(
+        w.engine.try_update_funding(&intruder, &MARKET),
+        Err(Ok(EngineError::NotKeeper.into()))
+    );
+}
+
+#[test]
+fn only_owner_can_close() {
+    let w = world();
+    let trader = w.funded_trader(101 * ONE);
+    let id = w.open_long(&trader, 100 * ONE, 1_000 * ONE);
+    let intruder = Address::generate(&w.e);
+    assert_eq!(
+        w.engine.try_close_position(&intruder, &id),
+        Err(Ok(EngineError::NotOwner.into()))
+    );
+}
+
+#[test]
+fn rejects_over_leverage_and_max_oi() {
+    let w = world();
+    let trader = w.funded_trader(200 * ONE);
+    // 30x > 20x cap
+    assert_eq!(
+        w.engine.try_open_position(
+            &trader,
+            &MARKET,
+            &Side::Long,
+            &(100 * ONE),
+            &(3_000 * ONE),
+            &0,
+            &0
+        ),
+        Err(Ok(EngineError::ExceedsMaxLeverage.into()))
+    );
+    // within leverage but beyond max OI (checks happen before any funds move)
+    assert_eq!(
+        w.engine.try_open_position(
+            &trader,
+            &MARKET,
+            &Side::Long,
+            &(55_000 * ONE),
+            &(1_100_000 * ONE),
+            &0,
+            &0
+        ),
+        Err(Ok(EngineError::ExceedsMaxOi.into()))
+    );
+}
+
+#[test]
+fn add_and_remove_margin() {
+    let w = world();
+    let trader = w.funded_trader(200 * ONE);
+    let id = w.open_long(&trader, 100 * ONE, 1_000 * ONE);
+    w.engine.add_margin(&trader, &id, &(50 * ONE));
+    assert_eq!(w.engine.get_position(&id).margin, 150 * ONE);
+    w.engine.remove_margin(&trader, &id, &(30 * ONE));
+    assert_eq!(w.engine.get_position(&id).margin, 120 * ONE);
+}

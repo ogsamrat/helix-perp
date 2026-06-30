@@ -280,3 +280,285 @@ impl PerpEngine {
             entry_price: price.price,
             fee,
         }
+        .publish(e);
+        id
+    }
+
+    /// Fully close a position, settling PnL + funding + close fee with the vault.
+    pub fn close_position(e: &Env, trader: Address, position_id: u64) {
+        let pos = Self::owned_position(e, &trader, position_id);
+        let cfg = Self::market(e, pos.market_id);
+        let price = Self::price(e, &cfg);
+
+        let pnl = position_pnl(pos.notional, pos.entry_price, price.price, pos.side);
+        let funding = funding_payment(
+            pos.notional,
+            Self::cum_funding(e, pos.market_id),
+            pos.entry_funding,
+            pos.side,
+        );
+        let close_fee = apply_bps(pos.notional, cfg.taker_fee_bps);
+        let equity = pos.margin + pnl - funding - close_fee;
+        let payout = equity.max(0);
+
+        Self::vault(e).settle(&pos.owner, &pos.margin, &payout);
+        Self::set_oi(
+            e,
+            pos.market_id,
+            pos.side,
+            Self::oi(e, pos.market_id, pos.side) - pos.notional,
+        );
+        Self::remove_position(e, &pos);
+
+        PositionClosed {
+            trader,
+            market_id: pos.market_id,
+            id: pos.id,
+            exit_price: price.price,
+            realized_pnl: pnl - funding - close_fee,
+            payout,
+        }
+        .publish(e);
+    }
+
+    /// Add collateral to a position (reduces leverage, pushes liq price away).
+    pub fn add_margin(e: &Env, trader: Address, position_id: u64, amount: i128) {
+        let mut pos = Self::owned_position(e, &trader, position_id);
+        if amount <= 0 {
+            panic_with_error!(e, EngineError::InvalidAmount);
+        }
+        Self::vault(e).add_margin(&trader, &amount);
+        pos.margin += amount;
+        Self::store_position(e, &pos);
+        Self::bump(e);
+        PositionModified {
+            trader,
+            id: pos.id,
+            kind: Symbol::new(e, "add_margin"),
+            margin: pos.margin,
+            notional: pos.notional,
+        }
+        .publish(e);
+    }
+
+    /// Withdraw free collateral, provided the position stays above maintenance and
+    /// within max leverage afterwards.
+    pub fn remove_margin(e: &Env, trader: Address, position_id: u64, amount: i128) {
+        let mut pos = Self::owned_position(e, &trader, position_id);
+        if amount <= 0 {
+            panic_with_error!(e, EngineError::InvalidAmount);
+        }
+        let new_margin = pos.margin - amount;
+        if new_margin <= 0 {
+            panic_with_error!(e, EngineError::InvalidAmount);
+        }
+        let cfg = Self::market(e, pos.market_id);
+        let price = Self::price(e, &cfg);
+        if pos.notional > new_margin * (cfg.max_leverage as i128) {
+            panic_with_error!(e, EngineError::ExceedsMaxLeverage);
+        }
+        let pnl = position_pnl(pos.notional, pos.entry_price, price.price, pos.side);
+        let funding = funding_payment(
+            pos.notional,
+            Self::cum_funding(e, pos.market_id),
+            pos.entry_funding,
+            pos.side,
+        );
+        let equity = new_margin + pnl - funding;
+        if equity < apply_bps(pos.notional, cfg.mmr_bps) {
+            panic_with_error!(e, EngineError::PositionUnhealthy);
+        }
+
+        Self::vault(e).settle(&trader, &amount, &amount);
+        pos.margin = new_margin;
+        Self::store_position(e, &pos);
+        Self::bump(e);
+        PositionModified {
+            trader,
+            id: pos.id,
+            kind: Symbol::new(e, "remove_margin"),
+            margin: pos.margin,
+            notional: pos.notional,
+        }
+        .publish(e);
+    }
+
+    /// Increase position size, pulling `add_margin` + fee and blending the entry
+    /// price. Accrued funding is settled first so the new baseline is clean.
+    pub fn increase(
+        e: &Env,
+        trader: Address,
+        position_id: u64,
+        add_margin: i128,
+        add_notional: i128,
+        ref_price: i128,
+        max_slippage_bps: u32,
+    ) {
+        let mut pos = Self::owned_position(e, &trader, position_id);
+        if add_margin <= 0 || add_notional <= 0 {
+            panic_with_error!(e, EngineError::InvalidAmount);
+        }
+        let cfg = Self::market(e, pos.market_id);
+        Self::ensure_active(e, &cfg);
+        let price = Self::price(e, &cfg);
+        Self::check_slippage(e, price.price, ref_price, max_slippage_bps);
+
+        // Settle funding accrued so far, then re-baseline.
+        let funding = funding_payment(
+            pos.notional,
+            Self::cum_funding(e, pos.market_id),
+            pos.entry_funding,
+            pos.side,
+        );
+        if funding >= pos.margin {
+            panic_with_error!(e, EngineError::PositionUnhealthy);
+        }
+        Self::vault(e).realize(&funding);
+        pos.margin -= funding;
+
+        let side_oi = Self::oi(e, pos.market_id, pos.side);
+        if side_oi + add_notional > cfg.max_oi {
+            panic_with_error!(e, EngineError::ExceedsMaxOi);
+        }
+
+        let fee = apply_bps(add_notional, cfg.taker_fee_bps);
+        Self::vault(e).lock_margin(&trader, &add_margin, &fee);
+
+        let new_notional = pos.notional + add_notional;
+        let new_margin = pos.margin + add_margin;
+        // Notional-weighted average entry price.
+        let new_entry =
+            (pos.notional * pos.entry_price + add_notional * price.price) / new_notional;
+
+        if new_notional > new_margin * (cfg.max_leverage as i128) {
+            panic_with_error!(e, EngineError::ExceedsMaxLeverage);
+        }
+        if new_margin < apply_bps(new_notional, cfg.imr_bps) {
+            panic_with_error!(e, EngineError::InsufficientMargin);
+        }
+
+        pos.notional = new_notional;
+        pos.margin = new_margin;
+        pos.entry_price = new_entry;
+        pos.entry_funding = Self::cum_funding(e, pos.market_id);
+        Self::store_position(e, &pos);
+        Self::set_oi(e, pos.market_id, pos.side, side_oi + add_notional);
+        Self::bump(e);
+        PositionModified {
+            trader,
+            id: pos.id,
+            kind: Symbol::new(e, "increase"),
+            margin: pos.margin,
+            notional: pos.notional,
+        }
+        .publish(e);
+    }
+
+    /// Partially close `close_notional` of a position at the current price.
+    pub fn decrease(
+        e: &Env,
+        trader: Address,
+        position_id: u64,
+        close_notional: i128,
+        ref_price: i128,
+        max_slippage_bps: u32,
+    ) {
+        let mut pos = Self::owned_position(e, &trader, position_id);
+        if close_notional <= 0 || close_notional >= pos.notional {
+            panic_with_error!(e, EngineError::InvalidAmount);
+        }
+        let cfg = Self::market(e, pos.market_id);
+        let price = Self::price(e, &cfg);
+        Self::check_slippage(e, price.price, ref_price, max_slippage_bps);
+
+        // Settle funding on the whole position, re-baseline.
+        let funding = funding_payment(
+            pos.notional,
+            Self::cum_funding(e, pos.market_id),
+            pos.entry_funding,
+            pos.side,
+        );
+        if funding >= pos.margin {
+            panic_with_error!(e, EngineError::PositionUnhealthy);
+        }
+        Self::vault(e).realize(&funding);
+        pos.margin -= funding;
+        pos.entry_funding = Self::cum_funding(e, pos.market_id);
+
+        let closed_margin = pos.margin * close_notional / pos.notional;
+        let pnl = position_pnl(close_notional, pos.entry_price, price.price, pos.side);
+        let close_fee = apply_bps(close_notional, cfg.taker_fee_bps);
+        let payout = (closed_margin + pnl - close_fee).max(0);
+
+        Self::vault(e).settle(&trader, &closed_margin, &payout);
+        pos.notional -= close_notional;
+        pos.margin -= closed_margin;
+        Self::store_position(e, &pos);
+        Self::set_oi(
+            e,
+            pos.market_id,
+            pos.side,
+            Self::oi(e, pos.market_id, pos.side) - close_notional,
+        );
+        Self::bump(e);
+        PositionModified {
+            trader,
+            id: pos.id,
+            kind: Symbol::new(e, "decrease"),
+            margin: pos.margin,
+            notional: pos.notional,
+        }
+        .publish(e);
+    }
+
+    /// Liquidate an under-margined position. Keeper-only. The keeper earns a
+    /// reward out of the liquidation penalty; any residual equity returns to the
+    /// trader and the rest accrues to LPs.
+    pub fn liquidate(e: &Env, keeper: Address, position_id: u64) {
+        keeper.require_auth();
+        if !Self::registry(e).is_keeper(&keeper) {
+            panic_with_error!(e, EngineError::NotKeeper);
+        }
+        let pos = Self::position(e, position_id);
+        let cfg = Self::market(e, pos.market_id);
+        let price = Self::price(e, &cfg);
+
+        let pnl = position_pnl(pos.notional, pos.entry_price, price.price, pos.side);
+        let funding = funding_payment(
+            pos.notional,
+            Self::cum_funding(e, pos.market_id),
+            pos.entry_funding,
+            pos.side,
+        );
+        let equity = pos.margin + pnl - funding;
+        let maintenance = apply_bps(pos.notional, cfg.mmr_bps);
+        if equity >= maintenance {
+            panic_with_error!(e, EngineError::NotLiquidatable);
+        }
+
+        let eq_pos = equity.max(0);
+        let penalty = apply_bps(pos.notional, cfg.liquidation_fee_bps);
+        let keeper_fee = penalty.min(eq_pos);
+        let trader_payout = eq_pos - keeper_fee;
+
+        Self::vault(e).settle_liquidation(
+            &pos.owner,
+            &keeper,
+            &pos.margin,
+            &trader_payout,
+            &keeper_fee,
+        );
+        Self::set_oi(
+            e,
+            pos.market_id,
+            pos.side,
+            Self::oi(e, pos.market_id, pos.side) - pos.notional,
+        );
+        Self::remove_position(e, &pos);
+
+        PositionLiquidated {
+            trader: pos.owner.clone(),
+            keeper,
+            id: pos.id,
+            market_id: pos.market_id,
+            mark_price: price.price,

@@ -78,3 +78,84 @@ export class Indexer {
       this.cursor = parsed.cursor;
       this.lastLedger = typeof parsed.lastLedger === "number" ? parsed.lastLedger : 0;
       this.openIds.clear();
+      for (const idStr of parsed.openPositionIds) {
+        try {
+          this.openIds.add(BigInt(idStr));
+        } catch {
+          // skip non-numeric ids
+        }
+      }
+      log.info("indexer state loaded", {
+        cursor: this.cursor,
+        openCount: this.openIds.size,
+        lastLedger: this.lastLedger,
+      });
+    } catch {
+      log.info("no prior indexer state; starting cold", { path: this.config.statePath });
+    }
+  }
+
+  /** Atomically persist current state to disk. */
+  save(): void {
+    const state: PersistedState = {
+      cursor: this.cursor,
+      openPositionIds: [...this.openIds].map((id) => id.toString()),
+      lastLedger: this.lastLedger,
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      const tmp = `${this.config.statePath}.tmp`;
+      writeFileSync(tmp, JSON.stringify(state, null, 2), "utf8");
+      renameSync(tmp, this.config.statePath);
+    } catch (err) {
+      captureError(err, { scope: "indexer.save", path: this.config.statePath });
+    }
+  }
+
+  /** Snapshot of currently-open position ids. */
+  openPositionIds(): bigint[] {
+    return [...this.openIds];
+  }
+
+  /**
+   * Pull all new events since the last cursor and fold them into the open-id
+   * set. On a cold start (no cursor) we begin `eventLookbackLedgers` before the
+   * latest ledger, clamped to the RPC's retained history.
+   */
+  async sync(): Promise<void> {
+    let pages = 0;
+    while (pages < MAX_PAGES_PER_CYCLE) {
+      pages++;
+      const request = await this.buildRequest();
+      let resp: rpc.Api.GetEventsResponse;
+      try {
+        resp = await this.client.server.getEvents(request);
+      } catch (err) {
+        // A stale cursor (outside retention) is the common failure: reset to a
+        // ledger-range start so the next attempt recovers.
+        captureError(err, { scope: "indexer.getEvents", hadCursor: this.cursor !== null });
+        if (this.cursor !== null) {
+          log.warn("resetting indexer cursor after getEvents failure");
+          this.cursor = null;
+        }
+        return;
+      }
+
+      for (const event of resp.events) {
+        this.applyEvent(event);
+      }
+
+      // Advance the cursor so the next page/cycle continues forward.
+      if (resp.cursor) this.cursor = resp.cursor;
+
+      // Fewer than a full page means we've drained the backlog for now.
+      if (resp.events.length < EVENTS_PAGE_LIMIT) break;
+    }
+
+    this.save();
+  }
+
+  private async buildRequest(): Promise<rpc.Api.GetEventsRequest> {
+    const filters: rpc.Api.EventFilter[] = [
+      {
+        type: "contract",

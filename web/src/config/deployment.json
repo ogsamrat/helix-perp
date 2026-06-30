@@ -1,0 +1,16 @@
+{
+  "network": "testnet",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "horizonUrl": "https://horizon-testnet.stellar.org",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "explorer": "https://stellar.expert/explorer/testnet",
+  "friendbot": "https://friendbot.stellar.org",
+  "contracts": {
+    "mockUsdc": "CCZ23IOAR23RXTJPLGR3A6SD4TLBIYFU4E42YRKC2RPVX2QRPUROIKBA",
+    "mockOracle": "CCIQ2IQLXN576DBZDLP6GKBBWQVYAZN2JHBGM4QQHFSVGBBKRK7W6WYZ",
+    "oracleAdapter": "CCMYNSD7ZYZVVFRRNNKSSMKQQTUDXBO3TCL6GBGMF4GKIFYBCK6IMQAW",
+    "marketRegistry": "CBKYVMWPQB7R3NXBJ45HVRZMIXFJ2NMRALCHLQHSVQY3MGN7D57SQZXL",
+    "collateralVault": "CBKEHG7LINNB73UIEKZNL7ALV7KYT63JU6WLD2BVUUW5GNO7764GVI2W",
+    "perpEngine": "CCNRZNFFDPY7Y2YNVTLT6RLCHIRHAX5D3B5TX7F2J3PBPO6FEKNBF3RU"
+  }
+}

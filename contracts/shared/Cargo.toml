@@ -1,0 +1,18 @@
+[package]
+name = "helix-shared"
+description = "Shared types, fixed-point math, and cross-contract config for the Helix perpetuals protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

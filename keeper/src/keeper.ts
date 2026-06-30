@@ -150,3 +150,79 @@ export class Keeper {
         log.info("funding updated", { market: market.label, marketId: market.id });
       } catch (err) {
         result.fundingFailed++;
+        captureError(err, { scope: "update_funding", market: market.label, marketId: market.id });
+      }
+    }
+  }
+
+  // --- step 3+4: liquidation scan ------------------------------------------
+
+  private async scanLiquidations(result: CycleResult): Promise<void> {
+    const ids = this.indexer.openPositionIds();
+    result.openPositions = ids.length;
+    log.info("scanning positions", { count: ids.length });
+
+    for (const id of ids) {
+      let view: PositionView;
+      try {
+        view = await this.client.read<PositionView>(this.config.perpEngineId, "position_view", [
+          StellarClient.u64ScVal(id),
+        ]);
+      } catch (err) {
+        // A view that errors usually means the position no longer exists
+        // (closed/liquidated by someone else); the indexer will catch up.
+        captureError(err, { scope: "position_view", id: id.toString() });
+        continue;
+      }
+
+      const underwater = view.equity < view.maintenance_margin;
+      log.debug("position health", {
+        id: id.toString(),
+        equity: view.equity,
+        maintenance: view.maintenance_margin,
+        underwater,
+      });
+      if (!underwater) continue;
+
+      try {
+        await this.client.invoke(this.config.perpEngineId, "liquidate", [
+          StellarClient.addressScVal(this.client.keeperPublicKey),
+          StellarClient.u64ScVal(id),
+        ]);
+        result.liquidated++;
+        log.info("liquidated position", {
+          id: id.toString(),
+          marketId: view.market_id,
+          equity: view.equity,
+          maintenance: view.maintenance_margin,
+        });
+      } catch (err) {
+        if (isNotLiquidatable(err)) {
+          result.notLiquidatable++;
+          log.info("position not liquidatable (recovered)", { id: id.toString() });
+        } else {
+          captureError(err, { scope: "liquidate", id: id.toString() });
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Detect the engine's `NotLiquidatable` error (variant #11). The exact wire
+ * shape varies (prepare-time simulation string vs. tx result), so we match
+ * either the symbolic name or the contract-error code defensively.
+ */
+function isNotLiquidatable(err: unknown): boolean {
+  const raw =
+    err instanceof ContractCallError
+      ? err.raw + " " + err.message
+      : err instanceof Error
+        ? err.message
+        : String(err);
+  return (
+    /NotLiquidatable/i.test(raw) ||
+    /Error\(Contract,\s*#?11\)/i.test(raw) ||
+    /#11\b/.test(raw)
+  );
+}

@@ -32,3 +32,38 @@ export default function PortfolioPage() {
     equityUnits += toUnits(p.margin) + net;
   }
 
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight text-ink">Portfolio</h1>
+          <p className="text-sm text-ink-muted">Your collateral, positions and live PnL.</p>
+        </div>
+        <GetFundsButton variant="secondary" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Wallet balance" value={fmtUsd(balance.data ?? 0n)} sub="USDC" />
+        <StatTile label="Open positions" value={list.length} sub={fmtUsd(totalNotional) + " notional"} />
+        <StatTile
+          label="Position equity"
+          value={fmtUsd(toScaled(equityUnits))}
+          sub="margin + unrealized"
+        />
+        <StatTile
+          label="Unrealized PnL"
+          value={<Signed positive={netUnits >= 0}>{fmtSignedUsd(toScaled(netUnits))}</Signed>}
+          sub={address ? "across all positions" : "connect wallet"}
+        />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Open positions</CardTitle>
+          <span className="text-2xs text-ink-faint">{list.length} open</span>
+        </CardHeader>
+        <PositionsTable />
+      </Card>
+    </div>
+  );
+}

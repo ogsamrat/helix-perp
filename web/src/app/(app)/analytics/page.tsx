@@ -79,3 +79,44 @@ export default function AnalyticsPage() {
             <span className="text-2xs text-ink-faint">{fmtPct(util / 100)}</span>
           </CardHeader>
           <CardBody>
+            <AreaChart data={gen("util", Math.max(util, 1), 48, 0.12)} stroke="rgb(240,186,90)" />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Funding rate</CardTitle>
+            <span className="text-2xs text-ink-faint">per period</span>
+          </CardHeader>
+          <CardBody>
+            <AreaChart data={gen("funding", 1, 48, 0.4)} stroke="rgb(142,149,162)" />
+          </CardBody>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Open interest by market</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {MARKETS.map((m, i) => {
+              const oi = [oi1, oi2, oi3][i];
+              const units = oi.data ? toUnits(oi.data.long + oi.data.short) : 0;
+              return (
+                <div key={m.id} className="rounded-lg border border-hairline bg-canvas p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-ink">{m.ticker}</span>
+                    <span className="tnum text-sm text-ink-muted">{fmtCompactUsd(units * 1e7)}</span>
+                  </div>
+                  <div className="mt-2">
+                    <AreaChart data={gen(m.feed, Math.max(units, 1), 32, 0.08)} stroke="rgb(var(--brand))" height={50} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}

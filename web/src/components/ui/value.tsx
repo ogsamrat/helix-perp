@@ -28,3 +28,33 @@ export function LiveNumber({
   }, [value]);
   return (
     <span
+      className={cn(
+        "tnum transition-colors duration-500",
+        flash === "up" && "text-long",
+        flash === "down" && "text-short",
+        className,
+      )}
+    >
+      {format(value)}
+    </span>
+  );
+}
+
+/** Signed, colored PnL/percent text. */
+export function Signed({
+  positive,
+  children,
+  className,
+  muted,
+}: {
+  positive: boolean;
+  children: React.ReactNode;
+  className?: string;
+  muted?: boolean;
+}) {
+  return (
+    <span className={cn("tnum", positive ? "text-long" : "text-short", muted && "opacity-90", className)}>
+      {children}
+    </span>
+  );
+}

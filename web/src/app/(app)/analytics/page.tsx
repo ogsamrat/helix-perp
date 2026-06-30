@@ -38,3 +38,44 @@ export default function AnalyticsPage() {
   const volUnits = totalOiUnits * 6.2; // illustrative cumulative volume proxy
 
   return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-lg font-semibold tracking-tight text-ink">Analytics</h1>
+        <p className="text-sm text-ink-muted">
+          Protocol metrics. Current values are read live from chain; time series are reconstructed
+          (the oracle exposes spot only).
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Total open interest" value={fmtCompactUsd(totalOiUnits * 1e7)} />
+        <StatTile label="Vault TVL" value={fmtCompactUsd(tvlUnits * 1e7)} />
+        <StatTile label="Utilization" value={fmtPct(util / 100)} />
+        <StatTile label="Volume (proxy)" value={fmtCompactUsd(volUnits * 1e7)} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Open interest</CardTitle>
+            <span className="text-2xs text-ink-faint">{fmtCompactUsd(totalOiUnits * 1e7)}</span>
+          </CardHeader>
+          <CardBody>
+            <AreaChart data={gen("oi", Math.max(totalOiUnits, 1))} stroke="rgb(var(--brand))" />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Vault TVL</CardTitle>
+            <span className="text-2xs text-ink-faint">{fmtCompactUsd(tvlUnits * 1e7)}</span>
+          </CardHeader>
+          <CardBody>
+            <AreaChart data={gen("tvl", Math.max(tvlUnits, 1), 48, 0.03)} stroke="rgb(46,199,133)" />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Utilization</CardTitle>
+            <span className="text-2xs text-ink-faint">{fmtPct(util / 100)}</span>
+          </CardHeader>
+          <CardBody>

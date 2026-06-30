@@ -34,3 +34,39 @@ export interface PositionView {
   leverageBps: bigint;
   marginRatioBps: bigint;
 }
+
+export interface OraclePrice {
+  price: bigint;
+  timestamp: number;
+}
+
+export interface VaultStats {
+  lpCash: bigint;
+  marginPool: bigint;
+  totalShares: bigint;
+  sharePrice: bigint;
+  totalAssets: bigint;
+  utilizationBps: bigint;
+}
+
+/** A decoded on-chain event for the activity feed. */
+export interface ChainEvent {
+  id: string;
+  type:
+    | "PositionOpened"
+    | "PositionClosed"
+    | "PositionModified"
+    | "PositionLiquidated"
+    | "FundingUpdated"
+    | "LiquidityAdded"
+    | "LiquidityRemoved"
+    | "MarginLocked"
+    | "Settled"
+    | "Unknown";
+  ledger: number;
+  txHash: string;
+  ts: number;
+  contractId: string;
+  topics: string[];
+  data: Record<string, unknown>;
+}

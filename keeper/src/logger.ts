@@ -41,3 +41,46 @@ export function serializeError(err: unknown): Record<string, unknown> {
     try {
       return { value: JSON.parse(JSON.stringify(err)) as unknown };
     } catch {
+      return { value: String(err) };
+    }
+  }
+  return { value: String(err) };
+}
+
+/**
+ * JSON.stringify replacer that makes BigInt (i128 values are common here) and
+ * Error values safe to serialise instead of throwing.
+ */
+function replacer(_key: string, value: unknown): unknown {
+  if (typeof value === "bigint") return value.toString();
+  if (value instanceof Error) return serializeError(value);
+  return value;
+}
+
+function emit(level: LogLevel, message: string, context?: LogContext): void {
+  if (LEVEL_ORDER[level] < LEVEL_ORDER[minLevel]) return;
+
+  const line: Record<string, unknown> = {
+    ts: new Date().toISOString(),
+    level,
+    msg: message,
+  };
+  if (context !== undefined) {
+    for (const [k, v] of Object.entries(context)) line[k] = v;
+  }
+
+  const serialized = JSON.stringify(line, replacer);
+  // Route warn/error to stderr, the rest to stdout.
+  if (level === "error" || level === "warn") {
+    process.stderr.write(serialized + "\n");
+  } else {
+    process.stdout.write(serialized + "\n");
+  }
+}
+
+export const log = {
+  debug: (message: string, context?: LogContext): void => emit("debug", message, context),
+  info: (message: string, context?: LogContext): void => emit("info", message, context),
+  warn: (message: string, context?: LogContext): void => emit("warn", message, context),
+  error: (message: string, context?: LogContext): void => emit("error", message, context),
+};

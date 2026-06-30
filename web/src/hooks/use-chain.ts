@@ -37,3 +37,43 @@ export function usePositions() {
     refetchInterval: 6_000,
   });
 }
+
+export function useVaultShares() {
+  const address = useWallet((s) => s.address);
+  return useQuery({
+    queryKey: ["shares", address],
+    queryFn: () => api.getVaultShares(address!),
+    enabled: !!address,
+  });
+}
+
+export function useUsdcBalance() {
+  const address = useWallet((s) => s.address);
+  return useQuery({
+    queryKey: ["balance", address],
+    queryFn: () => api.getUsdcBalance(address!),
+    enabled: !!address,
+    refetchInterval: 10_000,
+  });
+}
+
+export function useEvents() {
+  return useQuery({ queryKey: ["events"], queryFn: () => fetchEvents(), refetchInterval: 7_000 });
+}
+
+const DEFAULT_INVALIDATE = ["positions", "vault", "balance", "shares", "oi", "events", "prices"];
+
+/** Submit a contract call through the tx-lifecycle, then refresh chain queries. */
+export function useChainAction() {
+  const submit = useTxStore((s) => s.submit);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ call, invalidate }: { call: Call; invalidate?: string[] }) => {
+      const res = await submit(call, () => {
+        (invalidate ?? DEFAULT_INVALIDATE).forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      });
+      if (!res) throw new Error("Transaction was not confirmed");
+      return res as SubmitResult;
+    },
+  });
+}

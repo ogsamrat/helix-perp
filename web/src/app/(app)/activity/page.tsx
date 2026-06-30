@@ -101,3 +101,55 @@ export default function ActivityPage() {
           <p className="text-sm text-ink-muted">Live on-chain events from the protocol, straight off Soroban RPC.</p>
         </div>
         <div className="flex items-center gap-2 text-2xs text-ink-faint">
+          <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-long" /> live · refreshes every 7s
+        </div>
+      </div>
+
+      <Segmented options={FILTERS as any} value={filter} onChange={setFilter} size="sm" />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Event feed</CardTitle>
+          <span className="text-2xs text-ink-faint">{events.length} events</span>
+        </CardHeader>
+        {isLoading ? (
+          <div className="space-y-2 p-3">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : events.length === 0 ? (
+          <Empty icon={<Radio className="h-6 w-6" />} title="No recent events" description="Open a position or add liquidity to see live activity." />
+        ) : (
+          <div className="divide-y divide-hairline">
+            {events.map((e) => {
+              const { title, detail } = describe(e);
+              return (
+                <div key={e.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-hairline bg-canvas">
+                    {iconFor(e.type)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-ink">{title}</p>
+                    <p className="truncate text-2xs text-ink-faint">
+                      {detail} {e.topics?.[0]?.startsWith?.("G") ? `· ${shortAddr(e.topics[0])}` : ""}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <Badge variant="outline">{e.type.replace("Position", "")}</Badge>
+                    <p className="mt-1 text-2xs text-ink-faint">{e.ts ? timeAgo(e.ts) : `#${e.ledger}`}</p>
+                  </div>
+                  {e.txHash && (
+                    <a href={explorerTx(e.txHash)} target="_blank" rel="noreferrer" className="shrink-0 text-ink-faint hover:text-brand">
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}

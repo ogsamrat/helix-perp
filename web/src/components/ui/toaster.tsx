@@ -26,3 +26,31 @@ export function Toaster() {
             className="pointer-events-auto overflow-hidden rounded-lg border border-hairline bg-elevated shadow-pop"
           >
             <div className="flex items-start gap-3 p-3">
+              <div className="mt-0.5 shrink-0">{ICONS[t.variant]}</div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-ink">{t.title}</p>
+                {t.description && <p className="mt-0.5 break-words text-xs text-ink-muted">{t.description}</p>}
+                {t.href && (
+                  <a
+                    href={t.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1.5 inline-flex items-center gap-1 text-2xs font-medium text-brand hover:underline"
+                  >
+                    {t.hrefLabel ?? "View"} <ArrowUpRight className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+              <button
+                onClick={() => dismiss(t.id)}
+                className="shrink-0 text-ink-faint transition-colors hover:text-ink"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}

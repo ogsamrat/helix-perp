@@ -1,0 +1,45 @@
+# Helix Protocol — Soroban contract workspace
+# Resolved live (mid-2026): soroban-sdk 26.1.0 (stable) + OpenZeppelin stellar-* 0.7.2.
+[workspace]
+resolver = "2"
+members = [
+    "contracts/shared",
+    "contracts/mock_usdc",
+    "contracts/mock_oracle",
+    "contracts/oracle_adapter",
+    "contracts/market_registry",
+    "contracts/collateral_vault",
+    "contracts/perp_engine",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Helix Protocol"]
+repository = "https://github.com/helix-protocol/helix"
+rust-version = "1.85"
+
+[workspace.dependencies]
+soroban-sdk = "26.1.0"
+stellar-access = "0.7.2"
+stellar-tokens = "0.7.2"
+stellar-contract-utils = "0.7.2"
+stellar-macros = "0.7.2"
+helix-shared = { path = "contracts/shared" }
+
+# Optimized profile for on-chain WASM: small, deterministic, traps on overflow.
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true
+
+# release-with-logs for debugging on testnet without stripping
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true

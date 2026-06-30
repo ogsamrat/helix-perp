@@ -159,3 +159,84 @@ export class Indexer {
     const filters: rpc.Api.EventFilter[] = [
       {
         type: "contract",
+        contractIds: [this.config.perpEngineId],
+      },
+    ];
+
+    if (this.cursor !== null) {
+      // Cursor mode: startLedger/endLedger must be omitted.
+      return { filters, cursor: this.cursor, limit: EVENTS_PAGE_LIMIT };
+    }
+
+    // Ledger-range mode (cold start): begin lookback before the latest ledger.
+    const latest = await this.client.getLatestLedger();
+    const startLedger = Math.max(1, latest - this.config.eventLookbackLedgers);
+    log.info("indexer cold start", { startLedger, latest });
+    return { filters, startLedger, limit: EVENTS_PAGE_LIMIT };
+  }
+
+  private applyEvent(event: rpc.Api.EventResponse): void {
+    const name = this.eventName(event.topic);
+    if (name === undefined) return;
+
+    if (event.ledger > this.lastLedger) this.lastLedger = event.ledger;
+
+    const isOpen = OPEN_EVENTS.has(name);
+    const isClose = CLOSE_EVENTS.has(name);
+    if (!isOpen && !isClose) return;
+
+    const id = this.extractPositionId(event.value);
+    if (id === undefined) {
+      log.warn("could not extract position id from event", { name, ledger: event.ledger });
+      return;
+    }
+
+    if (isOpen) {
+      this.openIds.add(id);
+      log.debug("position opened", { id: id.toString(), ledger: event.ledger });
+    } else {
+      this.openIds.delete(id);
+      log.debug("position removed", { id: id.toString(), name, ledger: event.ledger });
+    }
+  }
+
+  /** First topic is the event-name symbol. */
+  private eventName(topics: xdr.ScVal[]): string | undefined {
+    const first = topics[0];
+    if (first === undefined) return undefined;
+    try {
+      const native = scValToNative(first);
+      return typeof native === "string" ? native : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Extract the `id` (u64) from the event body. The engine events carry `id` as
+   * a non-topic field, so it lives inside the event `value` map/struct. We also
+   * tolerate a bare scalar value, just in case.
+   */
+  private extractPositionId(value: xdr.ScVal): bigint | undefined {
+    let native: unknown;
+    try {
+      native = scValToNative(value);
+    } catch {
+      return undefined;
+    }
+    return coercePositionId(native);
+  }
+}
+
+function coercePositionId(native: unknown): bigint | undefined {
+  if (typeof native === "bigint") return native;
+  if (typeof native === "number" && Number.isInteger(native)) return BigInt(native);
+  if (typeof native === "object" && native !== null) {
+    const rec = native as Record<string, unknown>;
+    const raw = rec.id;
+    if (typeof raw === "bigint") return raw;
+    if (typeof raw === "number" && Number.isInteger(raw)) return BigInt(raw);
+    if (typeof raw === "string" && /^\d+$/.test(raw)) return BigInt(raw);
+  }
+  return undefined;
+}

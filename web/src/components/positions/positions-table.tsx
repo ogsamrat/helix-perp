@@ -40,3 +40,46 @@ export function PositionsTable({ marketId }: { marketId?: number }) {
   return (
     <div className="divide-y divide-hairline">
       <div className="hidden grid-cols-12 gap-2 px-4 py-2 text-2xs uppercase tracking-wide text-ink-faint md:grid">
+        <div className="col-span-2">Market</div>
+        <div className="col-span-2 text-right">Size</div>
+        <div className="col-span-2 text-right">Entry / Mark</div>
+        <div className="col-span-2 text-right">PnL</div>
+        <div className="col-span-2 text-right">Liq. / Margin</div>
+        <div className="col-span-2 text-right">Actions</div>
+      </div>
+      {positions.map((p) => (
+        <PositionRow key={p.id.toString()} p={p} />
+      ))}
+    </div>
+  );
+}
+
+function PositionRow({ p }: { p: PositionView }) {
+  const meta = marketById(p.marketId);
+  const address = useWallet((s) => s.address);
+  const action = useChainAction();
+  const live = useLiveMap();
+  const [manage, setManage] = useState(false);
+  if (!meta) return null;
+
+  // Mark + PnL track the live price; margin/liq come from chain.
+  const liveMark = live[meta.feed] ?? toUnits(p.markPrice);
+  const entry = toUnits(p.entryPrice);
+  const notional = toUnits(p.notional);
+  const sideMul = p.side === "Long" ? 1 : -1;
+  const pnlUnits = entry > 0 ? ((notional * (liveMark - entry)) / entry) * sideMul : 0;
+  const marginUnits = toUnits(p.margin);
+  const netUnits = pnlUnits - toUnits(p.funding);
+  const pnlPct = marginUnits > 0 ? (netUnits / marginUnits) * 100 : 0;
+  const ratioBps = Number(p.marginRatioBps);
+  const health = ratioBps < 400 ? "short" : ratioBps < 800 ? "warn" : "long";
+
+  const close = () =>
+    address && action.mutate({ call: calls.closePosition(address, p.id) });
+
+  return (
+    <div className="grid grid-cols-2 items-center gap-y-3 px-4 py-3 text-sm md:grid-cols-12 md:gap-2">
+      <div className="col-span-2 flex items-center gap-2">
+        <div>
+          <div className="font-medium text-ink">{meta.ticker}</div>
+          <Badge variant={p.side === "Long" ? "long" : "short"}>{p.side}</Badge>

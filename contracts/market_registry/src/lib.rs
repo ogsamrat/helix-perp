@@ -75,3 +75,81 @@ impl MarketRegistry {
         e.storage()
             .instance()
             .set(&DataKey::MarketIds, &Vec::<u32>::new(e));
+        e.storage()
+            .instance()
+            .extend_ttl(BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+
+    /// List a new market. Admin only.
+    #[only_admin]
+    pub fn add_market(e: &Env, cfg: MarketConfig) {
+        if e.storage().persistent().has(&DataKey::Market(cfg.id)) {
+            panic_with_error!(e, RegistryError::MarketAlreadyExists);
+        }
+        Self::validate(e, &cfg);
+        let mut ids: Vec<u32> = e
+            .storage()
+            .instance()
+            .get(&DataKey::MarketIds)
+            .unwrap_or(Vec::new(e));
+        ids.push_back(cfg.id);
+        e.storage().instance().set(&DataKey::MarketIds, &ids);
+        Self::store_market(e, &cfg);
+        MarketListed {
+            id: cfg.id,
+            symbol: cfg.symbol.clone(),
+        }
+        .publish(e);
+    }
+
+    /// Replace an existing market's configuration. Admin only.
+    #[only_admin]
+    pub fn update_market(e: &Env, cfg: MarketConfig) {
+        if !e.storage().persistent().has(&DataKey::Market(cfg.id)) {
+            panic_with_error!(e, RegistryError::MarketNotFound);
+        }
+        Self::validate(e, &cfg);
+        Self::store_market(e, &cfg);
+        MarketUpdated {
+            id: cfg.id,
+            paused: cfg.paused,
+        }
+        .publish(e);
+    }
+
+    /// Pause / unpause a single market. Requires the `pauser` role.
+    #[only_role(caller, "pauser")]
+    pub fn set_market_paused(e: &Env, caller: Address, id: u32, paused: bool) {
+        let mut cfg = Self::get_market(e, id);
+        cfg.paused = paused;
+        Self::store_market(e, &cfg);
+        MarketUpdated { id, paused }.publish(e);
+    }
+
+    /// Trip the global kill-switch (halts all engine entrypoints). `pauser` role.
+    #[only_role(caller, "pauser")]
+    pub fn pause(e: &Env, caller: Address) {
+        pausable::pause(e);
+    }
+
+    /// Release the global kill-switch. `pauser` role.
+    #[only_role(caller, "pauser")]
+    pub fn unpause(e: &Env, caller: Address) {
+        pausable::unpause(e);
+    }
+
+    /// Upgrade the contract's WASM. Admin only — the upgrade authority.
+    #[only_admin]
+    pub fn upgrade(e: &Env, new_wasm_hash: BytesN<32>) {
+        e.deployer().update_current_contract_wasm(new_wasm_hash);
+    }
+
+    // ---------------------------------------------------------------- views
+
+    /// Fetch a market's configuration. Panics with `MarketNotFound` if absent.
+    pub fn get_market(e: &Env, id: u32) -> MarketConfig {
+        e.storage()
+            .persistent()
+            .get(&DataKey::Market(id))
+            .unwrap_or_else(|| panic_with_error!(e, RegistryError::MarketNotFound))
+    }

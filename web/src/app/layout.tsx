@@ -14,3 +14,20 @@ export const metadata: Metadata = {
     description: "Leveraged perps on real-world assets, settled on-chain in USDC.",
     type: "website",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#08090c",
+  width: "device-width",
+  initialScale: 1,
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} dark`} suppressHydrationWarning>
+      <body className="min-h-screen bg-canvas font-sans text-ink antialiased">
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}

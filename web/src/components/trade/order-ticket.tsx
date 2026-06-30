@@ -82,3 +82,46 @@ export function OrderTicket({ meta, cfg, price }: { meta: MarketMeta; cfg: Marke
         onMax={address ? setMax : undefined}
         hint={
           address ? (
+            <span className="text-ink-faint">Bal {fmtUsd(balance.data ?? 0n)}</span>
+          ) : undefined
+        }
+      />
+
+      <LeverageSlider value={leverage} onChange={setLeverage} max={cfg.maxLeverage} />
+
+      <div className="rounded-lg border border-hairline bg-canvas p-3">
+        <StatRow label="Entry price" value={fmtPrice(BigInt(Math.round(price * 1e7)), meta.priceDecimals)} />
+        <StatRow label="Position size" value={fmtUsd(toScaled(preview.notional))} />
+        <StatRow label={`Est. fee (${fmtBps(cfg.takerFeeBps)})`} value={fmtUsd(toScaled(preview.fee))} />
+        <StatRow
+          label="Liq. price"
+          value={
+            <span className="text-warn">
+              {preview.liquidationPrice > 0 ? fmtPrice(toScaled(preview.liquidationPrice), meta.priceDecimals) : "—"}
+            </span>
+          }
+        />
+        <StatRow label="Slippage" value={fmtBps(slippageBps)} />
+      </div>
+
+      {!address ? (
+        <Button variant="primary" className="w-full" loading={connecting} onClick={() => connect()}>
+          Connect wallet to trade
+        </Button>
+      ) : balanceUnits <= 0 ? (
+        <GetFundsButton variant="primary" size="md" className="w-full" label="Get test USDC to start" />
+      ) : (
+        <Button
+          variant={side === "Long" ? "long" : "short"}
+          size="lg"
+          className="w-full"
+          disabled={!!reason}
+          loading={action.isPending}
+          onClick={submit}
+        >
+          {reason ?? `${side} ${meta.ticker}`}
+        </Button>
+      )}
+    </div>
+  );
+}

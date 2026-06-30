@@ -96,3 +96,53 @@ export async function invokeContract(opts: {
     if (got.status === rpc.Api.GetTransactionStatus.SUCCESS) {
       return {
         hash: sent.hash,
+        returnValue: got.returnValue ? scValToNative(got.returnValue) : null,
+      };
+    }
+    if (got.status === rpc.Api.GetTransactionStatus.FAILED) {
+      throw new Error(humanizeError(`Transaction ${sent.hash} failed on-chain`));
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  throw new Error("Transaction timed out awaiting confirmation.");
+}
+
+/** Whether an account exists + is funded on the network. */
+export async function accountExists(publicKey: string): Promise<boolean> {
+  try {
+    await server.getAccount(publicKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Fund an account on testnet via friendbot. */
+export async function fundWithFriendbot(publicKey: string): Promise<void> {
+  const res = await fetch(`${CONFIG.friendbot}?addr=${encodeURIComponent(publicKey)}`);
+  if (!res.ok && res.status !== 400) {
+    throw new Error(`Friendbot funding failed (${res.status})`);
+  }
+}
+
+/** Map raw Soroban/contract errors to human-readable messages. */
+export function humanizeError(raw: string): string {
+  const s = raw.toLowerCase();
+  if (s.includes("oraclestale") || s.includes("#4")) return "Oracle price is stale — try again shortly.";
+  if (s.includes("pricedeviation")) return "Oracle price moved too far — protection triggered.";
+  if (s.includes("slippage")) return "Price moved beyond your slippage tolerance.";
+  if (s.includes("exceedsmaxleverage")) return "Leverage exceeds this market's maximum.";
+  if (s.includes("insufficientmargin")) return "Margin is below the initial requirement.";
+  if (s.includes("exceedsmaxoi")) return "Market open-interest cap reached.";
+  if (s.includes("belowminsize")) return "Position size is below the minimum.";
+  if (s.includes("insufficientliquidity")) return "Vault has insufficient liquidity for this payout.";
+  if (s.includes("notliquidatable")) return "Position is still above maintenance margin.";
+  if (s.includes("notkeeper")) return "Only the keeper can perform this action.";
+  if (s.includes("notowner")) return "You don't own this position.";
+  if (s.includes("globalpaused") || s.includes("marketpaused")) return "Trading is paused.";
+  if (s.includes("balance") && s.includes("insufficient")) return "Insufficient USDC balance.";
+  if (s.includes("trustline") || s.includes("underfunded")) return "Insufficient balance for this action.";
+  if (s.includes("txbadseq")) return "Transaction sequence error — please retry.";
+  if (s.includes("user") && (s.includes("reject") || s.includes("declin"))) return "Request rejected in wallet.";
+  return raw.length > 160 ? raw.slice(0, 160) + "…" : raw;
+}

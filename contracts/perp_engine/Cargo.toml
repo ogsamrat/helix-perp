@@ -1,0 +1,25 @@
+[package]
+name = "perp_engine"
+description = "Position manager: open/close/modify/liquidate, PnL + funding + margin, cross-contract hub"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+helix-shared = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+helix-shared = { workspace = true, features = [] }
+market_registry = { path = "../market_registry" }
+collateral_vault = { path = "../collateral_vault" }
+oracle_adapter = { path = "../oracle_adapter" }
+mock_oracle = { path = "../mock_oracle" }
+mock_usdc = { path = "../mock_usdc" }

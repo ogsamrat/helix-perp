@@ -78,3 +78,44 @@ async function runLoop(keeper: Keeper, indexer: Indexer, intervalMs: number): Pr
     stopping = true;
     log.info("shutdown requested", { signal });
     if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    // If a cycle is mid-flight it owns the resolution (in tick's finally). If we
+    // are idle between cycles, resolve now so the process can exit promptly.
+    if (!cycleInFlight) finish();
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+  const tick = async (): Promise<void> => {
+    cycleInFlight = true;
+    try {
+      await keeper.runCycle();
+    } catch (err) {
+      captureError(err, { scope: "runCycle" });
+    } finally {
+      indexer.save();
+      cycleInFlight = false;
+    }
+
+    if (stopping) {
+      finish();
+      return;
+    }
+    timer = setTimeout(() => {
+      void tick();
+    }, intervalMs);
+  };
+
+  log.info("entering keeper loop", { intervalMs });
+  void tick();
+  await done;
+  log.info("keeper loop stopped");
+}
+
+main().catch((err) => {
+  captureError(err, { scope: "main" });
+  process.exitCode = 1;
+});

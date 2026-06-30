@@ -55,3 +55,61 @@ fn rejects_stale_price() {
     let f = setup(&e, 300, 5000);
     let feed = Symbol::new(&e, "EUR");
     f.adapter
+        .set_feed(&feed, &ReflectorAsset::Other(Symbol::new(&e, "EUR")));
+    // price stamped at t=1000, now=10000, age=9000 > max_age=300
+    f.oracle.set_price_at(
+        &ReflectorAsset::Other(Symbol::new(&e, "EUR")),
+        &(108 * E14),
+        &1_000,
+    );
+
+    let res = f.adapter.try_get_price(&feed);
+    assert_eq!(res, Err(Ok(OracleError::StalePrice.into())));
+}
+
+#[test]
+fn rejects_excessive_deviation() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let f = setup(&e, 300, 1000); // 10% max deviation
+    let feed = Symbol::new(&e, "XLM");
+    let asset = ReflectorAsset::Other(Symbol::new(&e, "XLM"));
+    f.adapter.set_feed(&feed, &asset);
+
+    f.oracle.set_price(&asset, &(12 * E14 / 100)); // $0.12
+    assert_eq!(f.adapter.get_price(&feed).price, 12 * E7 / 100);
+
+    // jump to $0.20 (+66%), far beyond the 10% band
+    f.oracle.set_price(&asset, &(20 * E14 / 100));
+    assert_eq!(
+        f.adapter.try_get_price(&feed),
+        Err(Ok(OracleError::PriceDeviationTooHigh.into()))
+    );
+}
+
+#[test]
+fn rejects_non_positive_price() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let f = setup(&e, 300, 1000);
+    let feed = Symbol::new(&e, "XAU");
+    let asset = ReflectorAsset::Other(Symbol::new(&e, "XAU"));
+    f.adapter.set_feed(&feed, &asset);
+    f.oracle.set_price(&asset, &0);
+    assert_eq!(
+        f.adapter.try_get_price(&feed),
+        Err(Ok(OracleError::InvalidPrice.into()))
+    );
+}
+
+#[test]
+fn rejects_unknown_feed() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let f = setup(&e, 300, 1000);
+    let feed = Symbol::new(&e, "BTC");
+    assert_eq!(
+        f.adapter.try_get_price(&feed),
+        Err(Ok(OracleError::FeedNotFound.into()))
+    );
+}

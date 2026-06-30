@@ -24,3 +24,29 @@ export function MarketStats({ meta, cfg, price }: { meta: MarketMeta; cfg: Marke
         label="Mark price"
         value={
           <LiveNumber
+            value={price}
+            format={(v) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: meta.priceDecimals, maximumFractionDigits: meta.priceDecimals })}
+            className="text-ink"
+          />
+        }
+      />
+      <Item label="Index (oracle)" value={<span className="tnum text-ink">{fmtPrice(BigInt(Math.round(price * 1e7)), meta.priceDecimals)}</span>} />
+      <Item
+        label="Funding / period"
+        value={<Signed positive={fr >= 0}>{fr >= 0 ? "+" : ""}{fr.toFixed(4)}%</Signed>}
+      />
+      <Item label="Long OI" value={<span className="tnum text-long">{fmtCompactUsd(longUnits * 1e7)}</span>} />
+      <Item label="Short OI" value={<span className="tnum text-short">{fmtCompactUsd(shortUnits * 1e7)}</span>} />
+      <Item label="Max leverage" value={<span className="tnum text-ink">{cfg.maxLeverage}x</span>} />
+    </div>
+  );
+}
+
+function Item({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="bg-surface px-3 py-2.5">
+      <p className="text-2xs uppercase tracking-wide text-ink-faint">{label}</p>
+      <p className="mt-0.5 text-sm font-medium">{value}</p>
+    </div>
+  );
+}

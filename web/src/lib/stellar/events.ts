@@ -37,3 +37,43 @@ export interface EventsPage {
 }
 
 /**
+ * Poll recent contract events (lightweight on-chain indexer). `sinceLedger`
+ * lets the activity feed page forward without re-reading the whole window.
+ */
+export async function fetchEvents(sinceLedger?: number, limit = 100): Promise<EventsPage> {
+  const latest = await server.getLatestLedger();
+  // Testnet RPC retains a rolling window of ledgers; stay safely inside it.
+  const fallback = Math.max(latest.sequence - 16000, 1);
+  const startLedger = sinceLedger && sinceLedger > fallback ? sinceLedger : fallback;
+
+  let res: any;
+  try {
+    res = await server.getEvents({
+      startLedger,
+      filters: WATCHED.map((id) => ({ type: "contract", contractIds: [id], topics: [] })),
+      limit,
+    } as any);
+  } catch {
+    return { events: [], latestLedger: latest.sequence };
+  }
+
+  const events: ChainEvent[] = (res.events ?? []).map((e: any) => {
+    const topics: string[] = (e.topic ?? []).map((t: any) => String(safeNative(t)));
+    const data = safeNative(e.value);
+    const ts = e.ledgerClosedAt ? Math.floor(Date.parse(e.ledgerClosedAt) / 1000) : 0;
+    return {
+      id: e.id ?? `${e.ledger}-${e.pagingToken ?? Math.random()}`,
+      type: normName(topics[0] ?? ""),
+      ledger: Number(e.ledger ?? 0),
+      txHash: e.txHash ?? "",
+      ts,
+      contractId: e.contractId?.toString?.() ?? String(e.contractId ?? ""),
+      topics: topics.slice(1),
+      data: (data && typeof data === "object" ? (data as Record<string, unknown>) : { value: data }) ?? {},
+    };
+  });
+
+  // newest first
+  events.reverse();
+  return { events, latestLedger: res.latestLedger ?? latest.sequence };
+}

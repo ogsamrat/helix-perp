@@ -48,3 +48,53 @@ export function PriceChart({ feed, price, decimals }: { feed: string; price: num
   const lastRef = useRef<any>(null);
 
   useEffect(() => {
+    if (!ref.current || price <= 0) return;
+    const chart = createChart(ref.current, {
+      autoSize: true,
+      layout: { background: { color: "transparent" }, textColor: COL.text, fontFamily: "var(--font-mono)" },
+      grid: { vertLines: { color: COL.grid }, horzLines: { color: COL.grid } },
+      rightPriceScale: { borderColor: "transparent" },
+      timeScale: { borderColor: "transparent", timeVisible: true, secondsVisible: false },
+      crosshair: { mode: 0 },
+    });
+    const series = chart.addCandlestickSeries({
+      upColor: COL.up,
+      downColor: COL.down,
+      borderUpColor: COL.up,
+      borderDownColor: COL.down,
+      wickUpColor: COL.up,
+      wickDownColor: COL.down,
+      priceFormat: { type: "price", precision: decimals, minMove: 1 / 10 ** decimals },
+    });
+    const data = buildCandles(feed, price);
+    series.setData(data);
+    lastRef.current = data[data.length - 1];
+    chart.timeScale().fitContent();
+    chartRef.current = chart;
+    seriesRef.current = series;
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
+    // rebuild only when the market (feed) changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feed]);
+
+  // live-update the last candle as the oracle price ticks
+  useEffect(() => {
+    const s = seriesRef.current;
+    const last = lastRef.current;
+    if (!s || !last || price <= 0) return;
+    const updated = {
+      ...last,
+      close: price,
+      high: Math.max(last.high, price),
+      low: Math.min(last.low, price),
+    };
+    lastRef.current = updated;
+    s.update(updated);
+  }, [price]);
+
+  return <div ref={ref} className="h-full w-full" />;
+}

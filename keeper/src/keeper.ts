@@ -74,3 +74,79 @@ export class Keeper {
       notLiquidatable: 0,
       pricesSimulated: 0,
     };
+
+    const startedAt = Date.now();
+    log.info("cycle start", { keeper: this.client.keeperPublicKey });
+
+    if (this.config.simulatePrices) {
+      result.pricesSimulated = await this.simulatePrices();
+    }
+
+    await this.updateAllFunding(result);
+
+    // Refresh the open-position set from chain events before scanning.
+    try {
+      await this.indexer.sync();
+    } catch (err) {
+      captureError(err, { scope: "indexer.sync" });
+    }
+
+    await this.scanLiquidations(result);
+
+    log.info("cycle done", { ...result, durationMs: Date.now() - startedAt });
+    return result;
+  }
+
+  // --- step 1: price simulation --------------------------------------------
+
+  private async simulatePrices(): Promise<number> {
+    let count = 0;
+    for (const market of MARKETS) {
+      try {
+        const next = this.nextSimPrice(market);
+        const scaled = priceToOracleI128(next, ORACLE_DECIMALS);
+        await this.client.invoke(this.config.mockOracleId, "set_price", [
+          StellarClient.reflectorOtherScVal(market.feed),
+          StellarClient.i128ScVal(scaled),
+        ]);
+        this.lastSimPrice.set(market.id, next);
+        count++;
+        log.debug("price nudged", { market: market.label, price: next });
+      } catch (err) {
+        captureError(err, { scope: "set_price", market: market.label });
+      }
+    }
+    return count;
+  }
+
+  /** Bounded random walk around the base price, max ~1% per tick. */
+  private nextSimPrice(market: Market): number {
+    const current = this.lastSimPrice.get(market.id) ?? market.basePrice;
+    const step = (Math.random() * 2 - 1) * MAX_TICK_FRACTION; // [-1%, +1%]
+    let next = current * (1 + step);
+
+    // Mean-revert toward base if we drift too far so the demo stays sane.
+    const lower = market.basePrice * (1 - MAX_DRIFT_FRACTION);
+    const upper = market.basePrice * (1 + MAX_DRIFT_FRACTION);
+    if (next < lower) next = lower;
+    if (next > upper) next = upper;
+
+    // Round to the market's price granularity (more dp for small prices).
+    const dp = market.basePrice >= 100 ? 2 : 6;
+    const factor = 10 ** dp;
+    return Math.round(next * factor) / factor;
+  }
+
+  // --- step 2: funding ------------------------------------------------------
+
+  private async updateAllFunding(result: CycleResult): Promise<void> {
+    for (const market of MARKETS) {
+      try {
+        await this.client.invoke(this.config.perpEngineId, "update_funding", [
+          StellarClient.addressScVal(this.client.keeperPublicKey),
+          StellarClient.u32ScVal(market.id),
+        ]);
+        result.fundingUpdated++;
+        log.info("funding updated", { market: market.label, marketId: market.id });
+      } catch (err) {
+        result.fundingFailed++;

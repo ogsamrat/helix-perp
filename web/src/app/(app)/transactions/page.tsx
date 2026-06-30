@@ -39,3 +39,44 @@ export default function TransactionsPage() {
         </CardHeader>
         {txs.length === 0 ? (
           <Empty
+            icon={<Receipt className="h-6 w-6" />}
+            title="No transactions yet"
+            description="Open a position, manage margin, or provide liquidity — they'll be tracked here."
+          />
+        ) : (
+          <div className="divide-y divide-hairline">
+            {txs.map((t) => {
+              const s = STATUS[t.status];
+              return (
+                <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="shrink-0">{s.node}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-ink">{t.label}</p>
+                    <p className="truncate text-2xs text-ink-faint">
+                      {t.hash ? (
+                        <span className="tnum">{shortAddr(t.hash, 6)}</span>
+                      ) : (
+                        t.error ?? "—"
+                      )}
+                    </p>
+                  </div>
+                  <Badge variant={s.variant}>{s.label}</Badge>
+                  {t.hash && (
+                    <a href={explorerTx(t.hash)} target="_blank" rel="noreferrer" className="text-ink-faint hover:text-brand">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                  {t.status === "failed" && (
+                    <Button size="sm" variant="secondary" onClick={() => retry(t.id)}>
+                      <RotateCw className="h-3.5 w-3.5" /> Retry
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}

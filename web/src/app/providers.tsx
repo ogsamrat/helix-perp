@@ -25,3 +25,31 @@ function LivePriceEngine() {
 
   return null;
 }
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  const [qc] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 4_000,
+            refetchInterval: 8_000,
+            refetchOnWindowFocus: true,
+            retry: 1,
+          },
+        },
+      }),
+  );
+  const restore = useWallet((s) => s.restore);
+  useEffect(() => {
+    void restore();
+  }, [restore]);
+
+  return (
+    <QueryClientProvider client={qc}>
+      <LivePriceEngine />
+      {children}
+      <Toaster />
+    </QueryClientProvider>
+  );
+}

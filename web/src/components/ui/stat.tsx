@@ -20,3 +20,25 @@ export function StatTile({
     </div>
   );
 }
+
+/** A compact key→value row for ticket previews and detail lists. */
+export function StatRow({
+  label,
+  value,
+  className,
+  hint,
+}: {
+  label: React.ReactNode;
+  value: React.ReactNode;
+  className?: string;
+  hint?: string;
+}) {
+  return (
+    <div className={cn("flex items-center justify-between py-1 text-sm", className)}>
+      <span className="text-ink-muted" title={hint}>
+        {label}
+      </span>
+      <span className="tnum text-ink">{value}</span>
+    </div>
+  );
+}

@@ -57,3 +57,63 @@ export default function TradePage() {
               <div className="flex w-full items-center justify-between">
                 <LiveNumber value={pUnits} format={(v) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: m.priceDecimals, maximumFractionDigits: m.priceDecimals })} className="text-sm text-ink-muted" />
                 <span className={cn("tnum text-2xs", chg >= 0 ? "text-long" : "text-short")}>
+                  {chg >= 0 ? "+" : ""}
+                  {chg.toFixed(2)}%
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {cfg ? <MarketStats meta={meta} cfg={cfg} price={price} /> : <Skeleton className="h-16 w-full" />}
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <Card className="overflow-hidden">
+            <CardHeader>
+              <CardTitle>
+                {meta.name} · {meta.ticker}
+              </CardTitle>
+              <span className="text-2xs text-ink-faint">Oracle: Reflector ({meta.feed})</span>
+            </CardHeader>
+            <div className="h-[380px] w-full p-2">
+              {price > 0 ? (
+                <PriceChart feed={meta.feed} price={price} decimals={meta.priceDecimals} />
+              ) : (
+                <Skeleton className="h-full w-full" />
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Positions</CardTitle>
+            </CardHeader>
+            <PositionsTable />
+          </Card>
+        </div>
+
+        <div className="lg:col-span-1">
+          <Card className="lg:sticky lg:top-[72px]">
+            <CardHeader>
+              <CardTitle>Order</CardTitle>
+              <span className="text-2xs text-ink-faint">Market · {meta.ticker}</span>
+            </CardHeader>
+            <CardBody>
+              {cfg ? (
+                <OrderTicket meta={meta} cfg={cfg} price={onchainPrice} />
+              ) : (
+                <div className="space-y-3">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

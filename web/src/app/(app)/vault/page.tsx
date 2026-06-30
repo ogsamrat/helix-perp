@@ -53,7 +53,7 @@ export default function VaultPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight text-ink">Liquidity Vault</h1>
+        <h1 className="font-display text-3xl tracking-tight text-ink">Liquidity Vault</h1>
         <p className="text-sm text-ink-muted">
           Provide USDC liquidity that backs every position. Earn taker fees + funding; bear trader PnL.
         </p>

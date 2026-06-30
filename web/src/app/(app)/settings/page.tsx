@@ -34,7 +34,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight text-ink">Settings</h1>
+        <h1 className="font-display text-3xl tracking-tight text-ink">Settings</h1>
         <p className="text-sm text-ink-muted">Wallet, network, trading preferences and protocol addresses.</p>
       </div>
 

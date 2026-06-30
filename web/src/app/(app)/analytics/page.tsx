@@ -40,7 +40,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight text-ink">Analytics</h1>
+        <h1 className="font-display text-3xl tracking-tight text-ink">Analytics</h1>
         <p className="text-sm text-ink-muted">
           Protocol metrics. Current values are read live from chain; time series are reconstructed
           (the oracle exposes spot only).

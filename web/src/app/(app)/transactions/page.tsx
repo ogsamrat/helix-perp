@@ -22,7 +22,7 @@ export default function TransactionsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-ink">Transactions</h1>
+          <h1 className="font-display text-3xl tracking-tight text-ink">Transactions</h1>
           <p className="text-sm text-ink-muted">Every write goes through one lifecycle: sign → submit → confirm.</p>
         </div>
         {txs.length > 0 && (

@@ -36,7 +36,7 @@ export default function PortfolioPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-ink">Portfolio</h1>
+          <h1 className="font-display text-3xl tracking-tight text-ink">Portfolio</h1>
           <p className="text-sm text-ink-muted">Your collateral, positions and live PnL.</p>
         </div>
         <GetFundsButton variant="secondary" />

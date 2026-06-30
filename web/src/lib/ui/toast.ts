@@ -21,3 +21,27 @@ interface ToastState {
 }
 
 let seq = 0;
+
+export const useToasts = create<ToastState>((set) => ({
+  toasts: [],
+  push: (t) => {
+    const id = t.id ?? `t${++seq}`;
+    const toast: Toast = {
+      id,
+      title: t.title,
+      description: t.description,
+      variant: t.variant ?? "default",
+      href: t.href,
+      hrefLabel: t.hrefLabel,
+      duration: t.duration ?? (t.variant === "loading" ? 0 : 5000),
+    };
+    set((s) => ({ toasts: [...s.toasts.filter((x) => x.id !== id), toast] }));
+    if (toast.duration > 0) {
+      setTimeout(() => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })), toast.duration);
+    }
+    return id;
+  },
+  update: (id, patch) =>
+    set((s) => ({ toasts: s.toasts.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
+  dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })),
+}));

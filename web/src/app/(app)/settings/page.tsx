@@ -44,3 +44,49 @@ export default function SettingsPage() {
             <CardTitle>Wallet</CardTitle>
           </CardHeader>
           <CardBody className="space-y-3">
+            {address ? (
+              <>
+                <StatRow label="Connected" value={<span className="tnum">{shortAddr(address, 6)}</span>} />
+                <StatRow label="Wallet" value={walletId ?? "—"} />
+                <div className="flex gap-2 pt-1">
+                  <GetFundsButton variant="secondary" size="sm" />
+                  <Button variant="ghost" size="sm" onClick={disconnect}>
+                    Disconnect
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Button variant="primary" onClick={() => connect()}>
+                Connect wallet
+              </Button>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Network</CardTitle>
+            <Badge variant="brand">{CONFIG.network}</Badge>
+          </CardHeader>
+          <CardBody className="space-y-1">
+            <StatRow label="Soroban RPC" value={<span className="tnum text-2xs">{CONFIG.rpcUrl.replace("https://", "")}</span>} />
+            <StatRow label="Horizon" value={<span className="tnum text-2xs">{CONFIG.horizonUrl.replace("https://", "")}</span>} />
+            <StatRow label="Passphrase" value={<span className="text-2xs">{CONFIG.networkPassphrase}</span>} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Trading</CardTitle>
+          </CardHeader>
+          <CardBody className="space-y-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-ink-muted">Slippage tolerance</span>
+                <span className="tnum text-ink">{fmtBps(slippageBps)}</span>
+              </div>
+              <div className="flex gap-2">
+                {[10, 50, 100].map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setSlippageBps(b)}

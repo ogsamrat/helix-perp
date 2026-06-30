@@ -135,3 +135,140 @@ impl CollateralVault {
         };
 
         Self::set_lp_cash(e, lp_cash + amount);
+        Self::set_total_shares(e, total_shares + shares);
+        Self::add_shares(e, &from, shares);
+        Self::bump(e);
+        LiquidityAdded {
+            provider: from,
+            amount,
+            shares,
+        }
+        .publish(e);
+        shares
+    }
+
+    /// Redeem `shares` for the pro-rata amount of `lp_cash`. Returns USDC out.
+    pub fn remove_liquidity(e: &Env, from: Address, shares: i128) -> i128 {
+        from.require_auth();
+        if shares <= 0 {
+            panic_with_error!(e, VaultError::InvalidAmount);
+        }
+        let owned = Self::shares_of(e, from.clone());
+        if owned < shares {
+            panic_with_error!(e, VaultError::InsufficientShares);
+        }
+        let lp_cash = Self::lp_cash(e);
+        let total_shares = Self::total_shares(e);
+        let amount = (shares * lp_cash) / total_shares;
+
+        Self::set_lp_cash(e, lp_cash - amount);
+        Self::set_total_shares(e, total_shares - shares);
+        Self::add_shares(e, &from, -shares);
+        Self::token(e).transfer(&e.current_contract_address(), &from, &amount);
+        Self::bump(e);
+        LiquidityRemoved {
+            provider: from,
+            amount,
+            shares,
+        }
+        .publish(e);
+        amount
+    }
+
+    // ----------------------------------------------------- engine-only custody
+
+    /// Pull `margin` + `fee` from a trader on position open. Margin is locked in
+    /// `margin_pool`; the open fee accrues to LPs. Engine only.
+    pub fn lock_margin(e: &Env, trader: Address, margin: i128, fee: i128) {
+        Self::require_engine(e);
+        if margin <= 0 || fee < 0 {
+            panic_with_error!(e, VaultError::InvalidAmount);
+        }
+        Self::token(e).transfer(&trader, &e.current_contract_address(), &(margin + fee));
+        Self::set_margin_pool(e, Self::margin_pool(e) + margin);
+        Self::set_lp_cash(e, Self::lp_cash(e) + fee);
+        Self::bump(e);
+        MarginLocked {
+            trader,
+            margin,
+            fee,
+        }
+        .publish(e);
+    }
+
+    /// Pull additional `amount` of margin into an existing position. Engine only.
+    pub fn add_margin(e: &Env, trader: Address, amount: i128) {
+        Self::require_engine(e);
+        if amount <= 0 {
+            panic_with_error!(e, VaultError::InvalidAmount);
+        }
+        Self::token(e).transfer(&trader, &e.current_contract_address(), &amount);
+        Self::set_margin_pool(e, Self::margin_pool(e) + amount);
+        Self::bump(e);
+    }
+
+    /// Settle a position close/decrease: release `margin` from the pool and pay
+    /// `payout` to the trader, with the net (payout − margin) flowing from/to LPs.
+    /// Engine only.
+    pub fn settle(e: &Env, trader: Address, margin: i128, payout: i128) {
+        Self::require_engine(e);
+        Self::move_pools(e, margin, payout);
+        if payout > 0 {
+            Self::token(e).transfer(&e.current_contract_address(), &trader, &payout);
+        }
+        Self::bump(e);
+        Settled {
+            trader,
+            margin,
+            payout,
+        }
+        .publish(e);
+    }
+
+    /// Settle a liquidation: release `margin`, pay the trader the residual and the
+    /// keeper its reward; the remainder accrues to LPs. Engine only.
+    pub fn settle_liquidation(
+        e: &Env,
+        trader: Address,
+        keeper: Address,
+        margin: i128,
+        trader_payout: i128,
+        keeper_fee: i128,
+    ) {
+        Self::require_engine(e);
+        if trader_payout < 0 || keeper_fee < 0 {
+            panic_with_error!(e, VaultError::InvalidAmount);
+        }
+        Self::move_pools(e, margin, trader_payout + keeper_fee);
+        if trader_payout > 0 {
+            Self::token(e).transfer(&e.current_contract_address(), &trader, &trader_payout);
+        }
+        if keeper_fee > 0 {
+            Self::token(e).transfer(&e.current_contract_address(), &keeper, &keeper_fee);
+        }
+        Self::bump(e);
+        Settled {
+            trader,
+            margin,
+            payout: trader_payout,
+        }
+        .publish(e);
+    }
+
+    /// Route a signed `delta` between the margin pool and LP cash *without* moving
+    /// tokens — used by the engine to settle accrued funding on `increase`/
+    /// `decrease`. `delta > 0`: trader pays (margin → LP); `delta < 0`: trader
+    /// receives (LP → margin). Engine only.
+    pub fn realize(e: &Env, delta: i128) {
+        Self::require_engine(e);
+        if delta == 0 {
+            return;
+        }
+        let margin_pool = Self::margin_pool(e);
+        let lp_cash = Self::lp_cash(e);
+        if delta > 0 {
+            if margin_pool < delta {
+                panic_with_error!(e, VaultError::AccountingError);
+            }
+            Self::set_margin_pool(e, margin_pool - delta);
+            Self::set_lp_cash(e, lp_cash + delta);

@@ -10,3 +10,15 @@ export function Topbar() {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-hairline bg-canvas/80 px-4 backdrop-blur md:px-6">
       <Link href="/" className="md:hidden">
+        <Logo />
+      </Link>
+      <div className="hidden items-center gap-2 md:flex">
+        <span className="h-1.5 w-1.5 rounded-full bg-long" />
+        <span className="text-2xs text-ink-faint">
+          {paused ? "Market paused" : "All systems operational"}
+        </span>
+      </div>
+      <WalletButton />
+    </header>
+  );
+}

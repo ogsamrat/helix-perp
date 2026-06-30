@@ -45,3 +45,51 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-feature-settings: "ss01", "cv01";
+  }
+  ::selection {
+    background: rgb(var(--brand) / 0.25);
+    color: rgb(var(--ink));
+  }
+  /* thin, quiet scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--line)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgb(var(--line));
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  /* Tabular monospace for ALL financial figures — digits never jitter on ticks. */
+  .tnum {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums slashed-zero;
+    font-feature-settings: "tnum", "zero";
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  /* faint dotted/line grid for the marketing hero */
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, rgb(var(--hairline) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--hairline) / 0.5) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+  }
+  .radial-fade {
+    background: radial-gradient(ellipse 70% 50% at 50% -10%, rgb(var(--brand) / 0.10), transparent 70%);
+  }
+  .hairline-b {
+    border-bottom: 1px solid rgb(var(--hairline));
+  }
+}

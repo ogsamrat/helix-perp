@@ -89,3 +89,94 @@ impl OracleAdapter {
             .instance()
             .set(&DataKey::OracleDecimals, &decimals);
     }
+
+    /// Map a protocol feed key (e.g. `XAU`) to a Reflector asset selector.
+    pub fn set_feed(e: &Env, feed: Symbol, asset: ReflectorAsset) {
+        Self::admin(e).require_auth();
+        e.storage()
+            .persistent()
+            .set(&DataKey::Feed(feed.clone()), &asset);
+        e.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Feed(feed), BUMP_THRESHOLD, BUMP_AMOUNT);
+        Self::bump_instance(e);
+    }
+
+    /// Remove a feed mapping.
+    pub fn remove_feed(e: &Env, feed: Symbol) {
+        Self::admin(e).require_auth();
+        e.storage().persistent().remove(&DataKey::Feed(feed));
+        Self::bump_instance(e);
+    }
+
+    /// Swap the upstream oracle (Reflector -> Pyth/DIA). Re-caches its precision.
+    pub fn set_reflector(e: &Env, reflector: Address) {
+        Self::admin(e).require_auth();
+        e.storage().instance().set(&DataKey::Reflector, &reflector);
+        let decimals = ReflectorClient::new(e, &reflector).decimals();
+        e.storage()
+            .instance()
+            .set(&DataKey::OracleDecimals, &decimals);
+        Self::bump_instance(e);
+    }
+
+    /// Update the freshness / deviation guard parameters.
+    pub fn set_guards(e: &Env, max_age: u64, max_deviation_bps: u32) {
+        Self::admin(e).require_auth();
+        e.storage().instance().set(&DataKey::MaxAge, &max_age);
+        e.storage()
+            .instance()
+            .set(&DataKey::MaxDeviationBps, &max_deviation_bps);
+        Self::bump_instance(e);
+    }
+
+    /// Transfer adapter admin.
+    pub fn set_admin(e: &Env, new_admin: Address) {
+        Self::admin(e).require_auth();
+        e.storage().instance().set(&DataKey::Admin, &new_admin);
+    }
+
+    /// Fetch, validate, normalise, and record a price for `feed`.
+    ///
+    /// Permissionless: anyone may refresh the cached price, but the value is fully
+    /// determined by the upstream oracle and the safety guards — there is no way to
+    /// inject an arbitrary price. Returns a 7-decimal [`OraclePrice`].
+    pub fn get_price(e: &Env, feed: Symbol) -> OraclePrice {
+        let asset: ReflectorAsset = e
+            .storage()
+            .persistent()
+            .get(&DataKey::Feed(feed.clone()))
+            .unwrap_or_else(|| panic_with_error!(e, OracleError::FeedNotFound));
+
+        let reflector: Address = e.storage().instance().get(&DataKey::Reflector).unwrap();
+        let raw: ReflectorPriceData = ReflectorClient::new(e, &reflector)
+            .lastprice(&asset)
+            .unwrap_or_else(|| panic_with_error!(e, OracleError::NoPriceData));
+
+        // Guard 1: positivity.
+        if raw.price <= 0 {
+            panic_with_error!(e, OracleError::InvalidPrice);
+        }
+
+        // Guard 2: freshness.
+        let max_age: u64 = e.storage().instance().get(&DataKey::MaxAge).unwrap();
+        let now = e.ledger().timestamp();
+        if now > raw.timestamp && now - raw.timestamp > max_age {
+            panic_with_error!(e, OracleError::StalePrice);
+        }
+
+        // Normalise upstream precision -> 7 dp.
+        let price = Self::normalize(e, raw.price);
+
+        // Guard 3: deviation from the last accepted price.
+        let max_dev: u32 = e
+            .storage()
+            .instance()
+            .get(&DataKey::MaxDeviationBps)
+            .unwrap();
+        if let Some(last) = e
+            .storage()
+            .persistent()
+            .get::<_, OraclePrice>(&DataKey::Last(feed.clone()))
+        {
+            let diff = (price - last.price).abs();

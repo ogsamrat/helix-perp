@@ -15,6 +15,7 @@ const config: Config = {
         canvas: "rgb(var(--canvas) / <alpha-value>)",
         surface: "rgb(var(--surface) / <alpha-value>)",
         elevated: "rgb(var(--elevated) / <alpha-value>)",
+        paper: "rgb(var(--paper) / <alpha-value>)",
         hairline: "rgb(var(--hairline) / <alpha-value>)",
         line: "rgb(var(--line) / <alpha-value>)",
         ink: "rgb(var(--ink) / <alpha-value>)",

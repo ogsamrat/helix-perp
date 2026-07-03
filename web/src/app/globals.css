@@ -3,28 +3,29 @@
 @tailwind utilities;
 
 :root {
-  /* surfaces — deep near-black canvas + 2 elevations (aurora glows behind) */
-  --canvas: 7 8 10;
-  --surface: 14 16 20;
-  --elevated: 22 25 31;
-  --hairline: 32 37 45;
-  --line: 48 54 65;
+  /* surfaces — clean near-black, flat elevations */
+  --canvas: 9 9 11;
+  --surface: 16 16 19;
+  --elevated: 24 24 28;
+  --hairline: 33 33 39;
+  --line: 47 47 54;
 
   /* text */
-  --ink: 233 236 242;
-  --ink-muted: 142 149 162;
-  --ink-faint: 92 99 112;
+  --ink: 240 240 243;
+  --ink-muted: 150 150 158;
+  --ink-faint: 96 96 104;
 
-  /* brand — warm gold (the RWA / FX story), used sparingly */
-  --brand: 226 178 99;
-  --brand-muted: 150 118 64;
+  /* near-white primary ("paper") + a restrained accent, used sparingly */
+  --paper: 244 244 247;
+  --brand: 223 197 141;
+  --brand-muted: 150 130 92;
 
-  /* directional / pnl semantics */
-  --long: 46 199 133;
-  --short: 240 105 118;
-  --warn: 240 186 90;
+  /* directional / pnl semantics — the only saturated color in the UI */
+  --long: 53 199 122;
+  --short: 242 94 106;
+  --warn: 236 179 92;
 
-  --ring: 226 178 99;
+  --ring: 240 240 243;
   --radius: 0.625rem;
 
   /* type system — Geist (UI) + Geist Mono (all numerics) */
@@ -106,11 +107,11 @@
     border-bottom: 1px solid rgb(var(--hairline));
   }
 
-  /* Editorial display serif — used sparingly for headlines + hero numerals. */
+  /* Tight, confident grotesk for headings — clean startup software, not decoration. */
   .font-display {
-    font-family: var(--font-display), Georgia, "Times New Roman", serif;
-    font-weight: 400;
-    letter-spacing: -0.015em;
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.03em;
   }
   /* Mono, uppercase, widely tracked — the small label that frames editorial type. */
   .eyebrow {

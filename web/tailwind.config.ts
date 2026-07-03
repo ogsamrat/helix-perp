@@ -61,6 +61,22 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(14px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "aurora-a": {
+          "0%,100%": { transform: "translate(0,0) scale(1)" },
+          "50%": { transform: "translate(12%,10%) scale(1.18)" },
+        },
+        "aurora-b": {
+          "0%,100%": { transform: "translate(0,0) scale(1)" },
+          "50%": { transform: "translate(-12%,8%) scale(1.12)" },
+        },
+        "aurora-c": {
+          "0%,100%": { transform: "translate(0,0) scale(1.05)" },
+          "50%": { transform: "translate(9%,-11%) scale(1.22)" },
+        },
+        float: {
+          "0%,100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.25s ease-out",
@@ -71,6 +87,10 @@ const config: Config = {
         "pulse-soft": "pulse-soft 1.8s ease-in-out infinite",
         marquee: "marquee 38s linear infinite",
         "reveal-up": "reveal-up 0.7s cubic-bezier(0.16,1,0.3,1) both",
+        "aurora-a": "aurora-a 26s ease-in-out infinite",
+        "aurora-b": "aurora-b 32s ease-in-out infinite",
+        "aurora-c": "aurora-c 30s ease-in-out infinite",
+        float: "float 7s ease-in-out infinite",
       },
     },
   },

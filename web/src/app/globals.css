@@ -3,12 +3,12 @@
 @tailwind utilities;
 
 :root {
-  /* surfaces — near-black canvas + 2 elevations */
-  --canvas: 8 9 12;
-  --surface: 13 15 19;
-  --elevated: 20 23 29;
-  --hairline: 32 36 44;
-  --line: 46 51 61;
+  /* surfaces — deep near-black canvas + 2 elevations (aurora glows behind) */
+  --canvas: 7 8 10;
+  --surface: 14 16 20;
+  --elevated: 22 25 31;
+  --hairline: 32 37 45;
+  --line: 48 54 65;
 
   /* text */
   --ink: 233 236 242;
@@ -38,12 +38,11 @@
   }
   html {
     color-scheme: dark;
+    background-color: rgb(var(--canvas));
   }
   body {
-    background-color: rgb(var(--canvas));
-    /* a whisper of a top spotlight so the canvas reads as depth, not flat black */
-    background-image: radial-gradient(58% 42% at 50% -6%, rgb(var(--brand) / 0.05), transparent 68%);
-    background-attachment: fixed;
+    /* transparent so the fixed Aurora layer shows through in the background */
+    background-color: transparent;
     color: rgb(var(--ink));
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;

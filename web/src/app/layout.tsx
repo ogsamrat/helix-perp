@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import { Fraunces } from "next/font/google";
+import { Aurora } from "@/components/ui/aurora";
 import { Grain } from "@/components/ui/grain";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -39,7 +40,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} dark`}
       suppressHydrationWarning
     >
-      <body className="min-h-screen bg-canvas font-sans text-ink antialiased">
+      <body className="min-h-screen font-sans text-ink antialiased">
+        <Aurora />
         <Grain />
         <Providers>{children}</Providers>
       </body>

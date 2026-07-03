@@ -72,7 +72,7 @@ function PositionRow({ p }: { p: PositionView }) {
   const netUnits = pnlUnits - toUnits(p.funding);
   const pnlPct = marginUnits > 0 ? (netUnits / marginUnits) * 100 : 0;
   const ratioBps = Number(p.marginRatioBps);
-  const health = ratioBps < 400 ? "short" : ratioBps < 800 ? "warn" : "long";
+  const healthColor = ratioBps < 400 ? "text-short" : ratioBps < 800 ? "text-warn" : "text-long";
 
   const close = () =>
     address && action.mutate({ call: calls.closePosition(address, p.id) });
@@ -103,7 +103,7 @@ function PositionRow({ p }: { p: PositionView }) {
       </Cell>
       <Cell label="Liq. / Margin" className="md:col-span-2">
         <div className="tnum text-warn">{fmtPrice(p.liquidationPrice, meta.priceDecimals)}</div>
-        <div className={cn("tnum text-2xs", `text-${health}`)}>{(ratioBps / 100).toFixed(2)}% ratio</div>
+        <div className={cn("tnum text-2xs", healthColor)}>{(ratioBps / 100).toFixed(2)}% ratio</div>
       </Cell>
       <div className="col-span-2 flex items-center justify-end gap-1.5">
         <Button size="sm" variant="ghost" onClick={() => setManage(true)} aria-label="Manage">

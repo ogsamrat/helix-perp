@@ -31,11 +31,11 @@ export function Segmented<T extends string>({
           key={o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "rounded-[6px] font-medium transition-colors",
+            "focus-ring rounded-[6px] font-medium transition-colors",
             size === "sm" ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm",
             value === o.value
               ? "bg-elevated text-ink shadow-soft"
-              : "text-ink-faint hover:text-ink-muted",
+              : "text-ink-muted hover:text-ink",
           )}
         >
           {o.label}

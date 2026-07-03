@@ -36,7 +36,7 @@ export function Dialog({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="relative z-10 w-full max-w-md overflow-hidden rounded-xl border border-hairline bg-surface shadow-pop"
+            className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-hairline bg-elevated shadow-pop"
           >
             <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
               <h3 className="text-sm font-medium text-ink">{title}</h3>

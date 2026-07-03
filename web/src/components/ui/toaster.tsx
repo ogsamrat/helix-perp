@@ -23,7 +23,7 @@ export function Toaster() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, x: 16, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="pointer-events-auto overflow-hidden rounded-lg border border-hairline bg-elevated shadow-pop"
+            className="glass pointer-events-auto overflow-hidden rounded-xl border border-hairline shadow-pop"
           >
             <div className="flex items-start gap-3 p-3">
               <div className="mt-0.5 shrink-0">{ICONS[t.variant]}</div>

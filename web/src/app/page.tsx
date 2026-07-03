@@ -54,17 +54,19 @@ export default function Landing() {
       </header>
 
       {/* hero */}
-      <section className="mx-auto grid max-w-6xl items-center gap-14 px-6 pb-20 pt-20 md:pt-28 lg:grid-cols-[1.05fr_0.95fr]">
-        <div>
-          <p className="eyebrow mb-7 animate-reveal-up" style={{ animationDelay: "0ms" }}>
-            Decentralized perpetual futures · Soroban
-          </p>
-          <h1
-            className="font-display max-w-2xl animate-reveal-up text-[3.25rem] leading-[0.98] text-ink sm:text-6xl md:text-7xl"
-            style={{ animationDelay: "80ms" }}
-          >
-            Leverage the real world.
-          </h1>
+      <section className="relative overflow-hidden">
+        <div className="grid-bg pointer-events-none absolute inset-0" />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-16 px-6 pb-24 pt-24 md:pt-32 lg:grid-cols-[1.08fr_0.92fr]">
+          <div>
+            <p className="eyebrow mb-8 animate-reveal-up" style={{ animationDelay: "0ms" }}>
+              Decentralized perpetual futures · Soroban
+            </p>
+            <h1
+              className="font-display max-w-2xl animate-reveal-up text-[3.5rem] leading-[0.93] tracking-[-0.045em] text-ink sm:text-6xl md:text-[5.25rem]"
+              style={{ animationDelay: "80ms" }}
+            >
+              Leverage the real world.
+            </h1>
           <p
             className="mt-8 max-w-lg animate-reveal-up text-lg leading-relaxed text-ink-muted"
             style={{ animationDelay: "180ms" }}
@@ -81,8 +83,10 @@ export default function Landing() {
             <GetFundsButton variant="secondary" size="lg" label="Get test funds" />
           </div>
         </div>
-        <div className="hidden animate-reveal-up justify-self-center lg:flex lg:justify-self-end" style={{ animationDelay: "340ms" }}>
-          <HeroPreview />
+          <div className="relative hidden animate-reveal-up justify-self-center lg:flex lg:justify-self-end" style={{ animationDelay: "340ms" }}>
+            <div className="pointer-events-none absolute -inset-10 -z-10 rounded-[48px] bg-brand/[0.09] blur-[90px]" />
+            <HeroPreview />
+          </div>
         </div>
       </section>
 
@@ -155,7 +159,7 @@ export default function Landing() {
                   href="/trade"
                   className="focus-ring group grid grid-cols-[2.5rem_1fr_auto] items-center gap-5 rounded-lg border-b border-hairline px-1 py-6 transition-colors hover:bg-surface/50 md:grid-cols-[3rem_1fr_1fr_auto] md:gap-8"
                 >
-                  <span className="tnum text-lg text-ink-faint">0{i + 1}</span>
+                  <span className="tnum text-lg text-brand/70">0{i + 1}</span>
                   <div>
                     <div className="font-display text-2xl text-ink md:text-3xl">{m.ticker}</div>
                     <div className="mt-0.5 text-sm text-ink-faint">
@@ -198,7 +202,7 @@ export default function Landing() {
                     delay={(i % 2) * 90}
                     className="flex gap-5 border-t border-hairline py-7 sm:[&:nth-child(-n+2)]:border-t-0 sm:[&:nth-child(odd)]:pr-8"
                   >
-                    <span className="tnum text-lg text-ink-faint">0{i + 1}</span>
+                    <span className="tnum text-lg text-brand/70">0{i + 1}</span>
                     <div>
                       <h3 className="text-base font-medium text-ink">{f.title}</h3>
                       <p className="mt-2 text-sm leading-relaxed text-ink-muted">{f.body}</p>
@@ -213,7 +217,7 @@ export default function Landing() {
 
       {/* closing CTA */}
       <Reveal>
-        <section className="mx-auto max-w-6xl px-6 py-28 text-center md:py-36">
+        <section className="mx-auto max-w-6xl px-6 py-24 text-center md:py-28">
           <p className="eyebrow mb-6">Live on Stellar {CONFIG.network}</p>
           <h2 className="font-display mx-auto max-w-3xl text-balance text-5xl leading-[1.03] text-ink md:text-7xl">
             Open a position in sixty seconds.

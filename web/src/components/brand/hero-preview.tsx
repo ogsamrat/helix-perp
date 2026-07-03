@@ -35,7 +35,7 @@ export function HeroPreview() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-display text-xl tracking-tight text-ink">XAU-PERP</span>
-              <span className="rounded-full border border-line bg-elevated px-2 py-0.5 text-2xs text-ink-muted">
+              <span className="rounded-full border border-brand/25 bg-brand/10 px-2 py-0.5 text-2xs text-brand">
                 Gold
               </span>
             </div>
@@ -47,7 +47,7 @@ export function HeroPreview() {
         </div>
 
         {/* chart */}
-        <div className="mt-4 h-28 w-full">
+        <div className="mt-4 h-36 w-full">
           <svg viewBox="0 0 108 88" preserveAspectRatio="none" className="h-full w-full">
             {[22, 44, 66].map((y) => (
               <line key={y} x1="0" x2="108" y1={y} y2={y} stroke="rgb(48,54,65)" strokeWidth="0.4" strokeOpacity="0.5" />

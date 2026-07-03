@@ -7,15 +7,15 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "brand-fill font-semibold text-[#1b1206] hover:brightness-[1.05] hover:glow-brand",
+        primary: "bg-paper font-semibold text-canvas hover:bg-paper/90",
         secondary:
-          "border border-line bg-elevated text-ink shadow-soft hover:border-ink-faint/70 hover:bg-elevated/70",
+          "border border-line bg-elevated/60 text-ink hover:border-ink-faint/60 hover:bg-elevated",
         ghost: "text-ink-muted hover:bg-elevated hover:text-ink",
-        outline: "border border-line text-ink hover:border-ink-faint/70 hover:bg-elevated/60",
-        long: "border border-long/25 bg-long/12 font-semibold text-long shadow-soft hover:border-long/45 hover:bg-long/20",
+        outline: "border border-line text-ink hover:border-ink-faint/60 hover:bg-elevated/60",
+        long: "border border-long/25 bg-long/12 font-semibold text-long hover:border-long/45 hover:bg-long/18",
         short:
-          "border border-short/25 bg-short/12 font-semibold text-short shadow-soft hover:border-short/45 hover:bg-short/20",
-        danger: "bg-short font-semibold text-canvas hover:brightness-105",
+          "border border-short/25 bg-short/12 font-semibold text-short hover:border-short/45 hover:bg-short/18",
+        danger: "bg-short font-semibold text-white hover:bg-short/90",
       },
       size: {
         sm: "h-8 px-3 text-xs",

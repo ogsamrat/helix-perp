@@ -51,7 +51,7 @@ export function AmountField({
         {onMax && (
           <button
             onClick={onMax}
-            className="mr-1 rounded px-2 py-1 text-2xs font-semibold text-brand hover:bg-brand/10"
+            className="focus-ring mr-1 rounded px-2 py-1 text-2xs font-semibold text-ink-muted hover:bg-elevated hover:text-ink"
           >
             MAX
           </button>
@@ -79,7 +79,7 @@ export function LeverageSlider({
     <div className="space-y-2">
       <div className="flex items-center justify-between text-xs">
         <span className="text-ink-muted">Leverage</span>
-        <span className="tnum rounded bg-elevated px-2 py-0.5 font-semibold text-brand">{value.toFixed(1)}x</span>
+        <span className="tnum rounded bg-elevated px-2 py-0.5 font-semibold text-ink">{value.toFixed(1)}x</span>
       </div>
       <input
         type="range"
@@ -88,7 +88,7 @@ export function LeverageSlider({
         step={0.5}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-line accent-brand [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:shadow"
+        className="focus-ring h-1.5 w-full cursor-pointer appearance-none rounded-full bg-line accent-ink [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-ink [&::-webkit-slider-thumb]:shadow"
       />
       <div className="flex justify-between text-2xs text-ink-faint">
         {marks.map((m) => (

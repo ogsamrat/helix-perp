@@ -42,9 +42,10 @@ const config: Config = {
         sm: "calc(var(--radius) - 5px)",
       },
       boxShadow: {
-        soft: "0 1px 2px 0 rgb(0 0 0 / 0.24), 0 1px 3px -1px rgb(0 0 0 / 0.18)",
-        elevated: "0 2px 6px -2px rgb(0 0 0 / 0.4), 0 12px 28px -10px rgb(0 0 0 / 0.5)",
-        pop: "0 16px 48px -16px rgb(0 0 0 / 0.65), 0 0 0 1px rgb(var(--hairline) / 0.9)",
+        soft: "0 1px 2px 0 rgb(0 0 0 / 0.24), inset 0 1px 0 0 rgb(255 255 255 / 0.04)",
+        elevated:
+          "0 2px 6px -2px rgb(0 0 0 / 0.4), 0 18px 44px -14px rgb(0 0 0 / 0.6), inset 0 1px 0 0 rgb(255 255 255 / 0.06)",
+        pop: "0 16px 48px -16px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(var(--hairline) / 0.9)",
         glow: "0 0 0 1px rgb(var(--brand) / 0.28), 0 10px 34px -10px rgb(var(--brand) / 0.28)",
       },
       keyframes: {

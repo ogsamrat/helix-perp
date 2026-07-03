@@ -11,9 +11,9 @@
   --line: 47 47 54;
 
   /* text */
-  --ink: 240 240 243;
-  --ink-muted: 150 150 158;
-  --ink-faint: 96 96 104;
+  --ink: 246 246 248;
+  --ink-muted: 154 154 162;
+  --ink-faint: 104 104 112;
 
   /* near-white primary ("paper") + a restrained accent, used sparingly */
   --paper: 244 244 247;
@@ -92,13 +92,14 @@
   .text-balance {
     text-wrap: balance;
   }
-  /* faint dotted/line grid for the marketing hero */
+  /* near-subliminal hairline grid — systematic-lane texture, faded to edges */
   .grid-bg {
     background-image:
-      linear-gradient(to right, rgb(var(--hairline) / 0.5) 1px, transparent 1px),
-      linear-gradient(to bottom, rgb(var(--hairline) / 0.5) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+      linear-gradient(to right, rgb(255 255 255 / 0.022) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.022) 1px, transparent 1px);
+    background-size: 72px 72px;
+    -webkit-mask-image: radial-gradient(120% 110% at 50% -10%, black 35%, transparent 92%);
+    mask-image: radial-gradient(120% 110% at 50% -10%, black 35%, transparent 92%);
   }
   .radial-fade {
     background: radial-gradient(ellipse 70% 50% at 50% -10%, rgb(var(--brand) / 0.10), transparent 70%);
@@ -107,11 +108,12 @@
     border-bottom: 1px solid rgb(var(--hairline));
   }
 
-  /* Tight, confident grotesk for headings — clean startup software, not decoration. */
+  /* Space Grotesk display — distinctive, technical, tightly tracked. */
   .font-display {
-    font-family: var(--font-sans), system-ui, sans-serif;
+    font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
     font-weight: 600;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
   }
   /* Mono, uppercase, widely tracked — the small label that frames editorial type. */
   .eyebrow {

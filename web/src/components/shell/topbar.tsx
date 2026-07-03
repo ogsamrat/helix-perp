@@ -9,7 +9,7 @@ export function Topbar() {
   const markets = useMarkets();
   const paused = markets.data?.some((m) => m.paused);
   return (
-    <header className="glass sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-hairline px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-hairline bg-canvas/85 px-4 backdrop-blur-sm md:px-6">
       <Link href="/" className="md:hidden">
         <Logo />
       </Link>

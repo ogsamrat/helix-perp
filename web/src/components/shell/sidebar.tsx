@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export function Sidebar() {
   const pathname = usePathname();
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-hairline bg-surface/40 md:flex">
+    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-hairline bg-canvas md:flex">
       <div className="flex h-16 items-center px-5">
         <Link href="/" className="transition-opacity hover:opacity-80">
           <Logo />
@@ -29,17 +29,17 @@ export function Sidebar() {
                   className={cn(
                     "focus-ring group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-150",
                     active
-                      ? "bg-elevated text-ink shadow-soft"
+                      ? "bg-elevated text-ink"
                       : "text-ink-muted hover:bg-elevated/50 hover:text-ink",
                   )}
                 >
                   {active && (
-                    <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand" />
+                    <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-ink" />
                   )}
                   <Icon
                     className={cn(
                       "h-[18px] w-[18px] transition-colors",
-                      active ? "text-brand" : "text-ink-faint group-hover:text-ink-muted",
+                      active ? "text-ink" : "text-ink-faint group-hover:text-ink-muted",
                     )}
                   />
                   {item.label}
@@ -65,7 +65,7 @@ export function Sidebar() {
 export function MobileTabBar() {
   const pathname = usePathname();
   return (
-    <nav className="glass fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-hairline md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-hairline bg-canvas/90 backdrop-blur-sm md:hidden">
       {NAV_ITEMS.slice(0, 5).map((item) => {
         const active = pathname.startsWith(item.href);
         const Icon = item.icon;
@@ -75,10 +75,10 @@ export function MobileTabBar() {
             href={item.href}
             className={cn(
               "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-2xs transition-colors",
-              active ? "text-brand" : "text-ink-faint",
+              active ? "text-ink" : "text-ink-faint",
             )}
           >
-            {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-brand" />}
+            {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-ink" />}
             <Icon className="h-[18px] w-[18px]" />
             {item.label}
           </Link>

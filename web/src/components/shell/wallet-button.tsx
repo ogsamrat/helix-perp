@@ -38,7 +38,7 @@ export function WalletButton() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="glass absolute right-0 z-50 mt-2 w-64 max-w-[calc(100vw-1.5rem)] animate-slide-up rounded-xl border border-hairline p-2 shadow-pop">
+          <div className="absolute right-0 z-50 mt-2 w-64 max-w-[calc(100vw-1.5rem)] animate-slide-up rounded-xl border border-hairline bg-elevated p-2 shadow-pop">
             <div className="rounded-md bg-canvas p-3">
               <p className="text-2xs text-ink-faint">Balance</p>
               <p className="tnum text-lg font-semibold text-ink">

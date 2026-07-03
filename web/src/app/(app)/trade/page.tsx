@@ -32,6 +32,7 @@ export default function TradePage() {
   const onchainPrice = toUnits(priceScaled);
   // Live mark drives the chart + stats; the order ticket uses the on-chain price.
   const price = live[meta.feed] ?? onchainPrice;
+  const selChg = seededChange(meta.feed);
 
   return (
     <div className="space-y-4">
@@ -46,12 +47,14 @@ export default function TradePage() {
               key={m.id}
               onClick={() => setSelectedId(m.id)}
               className={cn(
-                "flex min-w-[160px] flex-col items-start gap-1 rounded-lg border px-3.5 py-2.5 text-left transition-colors",
-                active ? "border-brand/40 bg-brand/5" : "border-hairline bg-surface hover:border-line",
+                "focus-ring sheen hover-lift flex min-w-[150px] flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left sm:min-w-[172px]",
+                active
+                  ? "border-brand/40 bg-brand/[0.06] shadow-soft"
+                  : "border-hairline bg-surface hover:border-line",
               )}
             >
               <div className="flex w-full items-center justify-between">
-                <span className="text-sm font-semibold text-ink">{m.ticker}</span>
+                <span className="text-sm font-semibold tracking-tight text-ink">{m.ticker}</span>
                 <Badge variant={active ? "brand" : "outline"}>{m.kind}</Badge>
               </div>
               <div className="flex w-full items-center justify-between">
@@ -72,10 +75,22 @@ export default function TradePage() {
         <div className="space-y-4 lg:col-span-2">
           <Card className="overflow-hidden">
             <CardHeader>
-              <CardTitle>
-                {meta.name} · {meta.ticker}
-              </CardTitle>
-              <span className="text-2xs text-ink-faint">Oracle: Reflector ({meta.feed})</span>
+              <div className="flex items-baseline gap-2.5">
+                <span className="font-display text-xl tracking-tight text-ink">{meta.ticker}</span>
+                <span className="text-xs text-ink-faint">{meta.name}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <LiveNumber
+                  value={price}
+                  format={(v) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: meta.priceDecimals, maximumFractionDigits: meta.priceDecimals })}
+                  className="text-base font-medium text-ink"
+                />
+                <span className={cn("tnum text-xs", selChg >= 0 ? "text-long" : "text-short")}>
+                  {selChg >= 0 ? "+" : ""}
+                  {selChg.toFixed(2)}%
+                </span>
+                <span className="hidden text-2xs text-ink-faint sm:inline">Reflector · {meta.feed}</span>
+              </div>
             </CardHeader>
             <div className="h-[380px] w-full p-2">
               {price > 0 ? (

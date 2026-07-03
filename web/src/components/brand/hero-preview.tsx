@@ -28,14 +28,14 @@ const CANDLES = (() => {
  */
 export function HeroPreview() {
   return (
-    <div className="animate-float">
-      <div className="sheen relative w-full max-w-md rounded-2xl border border-hairline bg-surface/80 p-4 shadow-pop backdrop-blur-md">
+    <div className="w-full max-w-md">
+      <div className="relative rounded-2xl border border-hairline bg-surface p-4 shadow-elevated">
         {/* header */}
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2">
               <span className="font-display text-xl tracking-tight text-ink">XAU-PERP</span>
-              <span className="rounded-full border border-brand/30 bg-brand/15 px-2 py-0.5 text-2xs text-brand">
+              <span className="rounded-full border border-line bg-elevated px-2 py-0.5 text-2xs text-ink-muted">
                 Gold
               </span>
             </div>
@@ -54,7 +54,7 @@ export function HeroPreview() {
             ))}
             {CANDLES.map((c, i) => {
               const x = 4 + i * 5.2;
-              const col = c.up ? "rgb(46,199,133)" : "rgb(240,105,118)";
+              const col = c.up ? "rgb(53,199,122)" : "rgb(242,94,106)";
               const bodyTop = 88 - Math.max(c.open, c.close);
               const bodyH = Math.max(1.4, Math.abs(c.close - c.open));
               return (
@@ -90,7 +90,7 @@ export function HeroPreview() {
             Short
           </div>
         </div>
-        <div className="brand-fill mt-2 rounded-md py-2.5 text-center text-sm font-semibold text-[#1b1206]">
+        <div className="mt-2 rounded-md bg-paper py-2.5 text-center text-sm font-semibold text-canvas">
           Open position
         </div>
       </div>

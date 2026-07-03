@@ -104,8 +104,8 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* live marquee */}
-        <div className="relative border-y border-hairline bg-surface/30 py-3.5">
+        {/* live marquee (decorative — real prices live in the markets list below) */}
+        <div aria-hidden className="relative border-y border-hairline bg-surface/30 py-3.5">
           <div className="mask-fade-r overflow-hidden">
             <div className="flex w-max animate-marquee items-center gap-10 pr-10">
               {[...MARKETS, ...MARKETS, ...MARKETS, ...MARKETS].map((m, i) => {
@@ -176,7 +176,7 @@ export default function Landing() {
               <Link
                 key={m.id}
                 href="/trade"
-                className="group grid grid-cols-[2.5rem_1fr_auto] items-center gap-5 border-b border-hairline py-6 transition-colors hover:bg-surface/40 md:grid-cols-[3rem_1fr_1fr_auto] md:gap-8"
+                className="focus-ring group grid grid-cols-[2.5rem_1fr_auto] items-center gap-5 rounded-lg border-b border-hairline px-1 py-6 transition-colors hover:bg-surface/40 md:grid-cols-[3rem_1fr_1fr_auto] md:gap-8"
               >
                 <span className="font-display text-xl text-ink-faint">0{i + 1}</span>
                 <div>

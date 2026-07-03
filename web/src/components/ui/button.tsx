@@ -3,22 +3,24 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40 active:scale-[0.985]",
+  "relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-40 active:scale-[0.98] active:duration-75",
   {
     variants: {
       variant: {
-        primary: "bg-brand font-semibold text-canvas shadow-soft hover:bg-brand/90",
-        secondary: "border border-line bg-elevated text-ink hover:border-ink-faint",
+        primary: "brand-fill font-semibold text-[#1b1206] hover:brightness-[1.05] hover:glow-brand",
+        secondary:
+          "border border-line bg-elevated text-ink shadow-soft hover:border-ink-faint/70 hover:bg-elevated/70",
         ghost: "text-ink-muted hover:bg-elevated hover:text-ink",
-        outline: "border border-line text-ink hover:bg-elevated",
-        long: "border border-long/30 bg-long/15 font-semibold text-long hover:bg-long/25",
-        short: "border border-short/30 bg-short/15 font-semibold text-short hover:bg-short/25",
-        danger: "bg-short font-semibold text-canvas hover:bg-short/90",
+        outline: "border border-line text-ink hover:border-ink-faint/70 hover:bg-elevated/60",
+        long: "border border-long/25 bg-long/12 font-semibold text-long shadow-soft hover:border-long/45 hover:bg-long/20",
+        short:
+          "border border-short/25 bg-short/12 font-semibold text-short shadow-soft hover:border-short/45 hover:bg-short/20",
+        danger: "bg-short font-semibold text-canvas hover:brightness-105",
       },
       size: {
         sm: "h-8 px-3 text-xs",
         md: "h-10 px-4 text-sm",
-        lg: "h-12 px-6 text-base",
+        lg: "h-12 px-6 text-[15px]",
         icon: "h-9 w-9",
       },
     },

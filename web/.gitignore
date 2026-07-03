@@ -1,1 +1,6 @@
 .vercel
+
+# local visual-review artifacts
+shots/
+test-results/
+web/shot.mjs

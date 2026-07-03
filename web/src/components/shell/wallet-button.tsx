@@ -25,7 +25,7 @@ export function WalletButton() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-md border border-line bg-elevated px-2.5 py-1.5 text-sm transition-colors hover:border-ink-faint"
+        className="focus-ring flex items-center gap-2 rounded-full border border-line bg-elevated px-3 py-1.5 text-sm transition-all hover:border-ink-faint/70 hover:bg-elevated/70"
       >
         {balance.data !== undefined && (
           <span className="tnum hidden text-ink-muted sm:inline">{fmtUsd(balance.data)}</span>
@@ -38,7 +38,7 @@ export function WalletButton() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-64 animate-slide-up rounded-lg border border-hairline bg-elevated p-2 shadow-pop">
+          <div className="glass absolute right-0 z-50 mt-2 w-64 max-w-[calc(100vw-1.5rem)] animate-slide-up rounded-xl border border-hairline p-2 shadow-pop">
             <div className="rounded-md bg-canvas p-3">
               <p className="text-2xs text-ink-faint">Balance</p>
               <p className="tnum text-lg font-semibold text-ink">
@@ -89,7 +89,7 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors hover:bg-canvas ${
+      className={`focus-ring flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors hover:bg-canvas ${
         danger ? "text-short" : "text-ink-muted hover:text-ink"
       }`}
     >

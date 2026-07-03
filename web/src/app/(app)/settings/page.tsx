@@ -91,7 +91,7 @@ export default function SettingsPage() {
                     key={b}
                     onClick={() => setSlippageBps(b)}
                     className={`focus-ring flex-1 rounded-md border py-1.5 text-xs transition-colors ${
-                      slippageBps === b ? "border-brand/40 bg-brand/15 text-brand" : "border-line text-ink-muted hover:text-ink"
+                      slippageBps === b ? "border-ink/25 bg-elevated text-ink" : "border-line text-ink-muted hover:text-ink"
                     }`}
                   >
                     {fmtBps(b)}
@@ -103,7 +103,7 @@ export default function SettingsPage() {
               <span className="text-sm text-ink-muted">Expert mode</span>
               <button
                 onClick={() => setExpertMode(!expertMode)}
-                className={`focus-ring relative h-5 w-9 rounded-full transition-colors ${expertMode ? "bg-brand" : "bg-line"}`}
+                className={`focus-ring relative h-5 w-9 rounded-full transition-colors ${expertMode ? "bg-ink" : "bg-line"}`}
               >
                 <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-canvas transition-all ${expertMode ? "left-[18px]" : "left-0.5"}`} />
               </button>

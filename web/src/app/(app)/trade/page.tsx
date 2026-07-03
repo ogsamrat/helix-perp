@@ -47,15 +47,15 @@ export default function TradePage() {
               key={m.id}
               onClick={() => setSelectedId(m.id)}
               className={cn(
-                "focus-ring sheen hover-lift flex min-w-[150px] flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left sm:min-w-[172px]",
+                "focus-ring flex min-w-[150px] flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-colors sm:min-w-[172px]",
                 active
-                  ? "border-brand/40 bg-brand/[0.06] shadow-soft"
+                  ? "border-ink/25 bg-elevated"
                   : "border-hairline bg-surface hover:border-line",
               )}
             >
               <div className="flex w-full items-center justify-between">
                 <span className="text-sm font-semibold tracking-tight text-ink">{m.ticker}</span>
-                <Badge variant={active ? "brand" : "outline"}>{m.kind}</Badge>
+                <Badge variant={active ? "neutral" : "outline"}>{m.kind}</Badge>
               </div>
               <div className="flex w-full items-center justify-between">
                 <LiveNumber value={pUnits} format={(v) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: m.priceDecimals, maximumFractionDigits: m.priceDecimals })} className="text-sm text-ink-muted" />

@@ -41,6 +41,9 @@
   }
   body {
     background-color: rgb(var(--canvas));
+    /* a whisper of a top spotlight so the canvas reads as depth, not flat black */
+    background-image: radial-gradient(58% 42% at 50% -6%, rgb(var(--brand) / 0.05), transparent 68%);
+    background-attachment: fixed;
     color: rgb(var(--ink));
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -49,6 +52,17 @@
   ::selection {
     background: rgb(var(--brand) / 0.25);
     color: rgb(var(--ink));
+  }
+  /* Respect users who prefer less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
   /* thin, quiet scrollbars */
   * {
@@ -132,5 +146,45 @@
   .mask-fade-r {
     -webkit-mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
     mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+  }
+  /* Frosted glass for floating chrome (topbar, dropdowns, dialogs). */
+  .glass {
+    background-color: rgb(var(--surface) / 0.72);
+    backdrop-filter: blur(18px) saturate(1.3);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  }
+  .hover-lift {
+    transition:
+      transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 0.22s ease,
+      background-color 0.22s ease,
+      box-shadow 0.22s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+  /* A gradient hairline: brighter at the top edge, fading down — expensive depth. */
+  .border-gradient {
+    border: 1px solid transparent;
+    background:
+      linear-gradient(rgb(var(--surface)), rgb(var(--surface))) padding-box,
+      linear-gradient(180deg, rgb(var(--ink) / 0.12), rgb(var(--hairline) / 0.35) 40%) border-box;
+  }
+  /* Gold gradient fill for the primary CTA + an inner top highlight. */
+  .brand-fill {
+    background-image: linear-gradient(180deg, rgb(244 210 150), rgb(var(--brand)) 55%, rgb(210 162 84));
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.28),
+      inset 0 -1px 0 0 rgb(0 0 0 / 0.18);
+  }
+  .glow-brand {
+    box-shadow: 0 8px 30px -10px rgb(var(--brand) / 0.5);
+  }
+  /* Consistent keyboard focus ring for custom interactive elements. */
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgb(var(--canvas)),
+      0 0 0 4px rgb(var(--brand) / 0.45);
   }
 }

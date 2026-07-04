@@ -55,6 +55,7 @@ Perpetual futures are the highest-volume product in DeFi, yet they almost exclus
 - **Custody isolated from logic** — funds in the vault, trading in the engine, control in the registry; each upgradeable independently.
 - **Hardened oracle** — a swappable Reflector adapter that rejects stale prices, bounds tick-to-tick deviation and refuses non-positive prices, surfaced as typed contract errors.
 - **Real Reflector prices** — the keeper relays live prices from Reflector's decentralised SEP-40 testnet oracle (XLM, EUR) into the protocol each cycle, clamp-converged to stay inside the deviation guard.
+- **On-chain limit / stop-loss / take-profit orders** — resting orders live in the engine with margin escrowed at placement, so the keeper fills them when the price trigger is crossed without a trader signature. Cancels refund in full.
 - **On-chain leaderboard** — traders ranked by realized PnL and protocol stats, aggregated live from engine events straight off Soroban RPC. No backend, no database.
 - **Live keeper** — a scheduled GitHub Action runs one keeper cycle every ~10 min (relay prices, advance funding, liquidate) so the deployed demo stays alive with no always-on server.
 - **Shared LP vault** — one USDC pool is the counterparty to every position, with ERC-4626-style shares.

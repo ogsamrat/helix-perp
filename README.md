@@ -5,7 +5,7 @@
 **Decentralized perpetual futures on gold, FX and crypto — margined and settled on-chain in USDC, on Stellar / Soroban.**
 
 <p>
-  <a href="https://web-two-lac-42.vercel.app"><b>Live Demo</b></a>
+  <a href="https://helix-perp.vercel.app"><b>Live Demo</b></a>
   &nbsp;&middot;&nbsp;
   <a href="#deployment-stellar-testnet"><b>Contracts</b></a>
   &nbsp;&middot;&nbsp;
@@ -254,7 +254,7 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs format, clippy, t
 
 ## 60-second demo
 
-1. Open the [live app](https://web-two-lac-42.vercel.app) — a terminal-grade landing page with live oracle prices for XAU, EUR and XLM.
+1. Open the [live app](https://helix-perp.vercel.app) — a terminal-grade landing page with live oracle prices for XAU, EUR and XLM.
 2. **Launch terminal**, **Connect wallet** (Freighter), then **Get test funds** — one click funds your account via friendbot and mints 10,000 USDC.
 3. On **Trade**, pick XAU-PERP, drag leverage to 10x, enter margin, and watch the liquidation price and fee update live. Open a long and approve in your wallet.
 4. The toast tracks sign &rarr; submit &rarr; confirm; the position appears instantly with live PnL and margin ratio.

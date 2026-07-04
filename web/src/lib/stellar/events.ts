@@ -42,8 +42,9 @@ export interface EventsPage {
  */
 export async function fetchEvents(sinceLedger?: number, limit = 100): Promise<EventsPage> {
   const latest = await server.getLatestLedger();
-  // Testnet RPC retains a rolling window of ledgers; stay safely inside it.
-  const fallback = Math.max(latest.sequence - 16000, 1);
+  // Testnet RPC only retains a rolling window (~10-14h). A startLedger set
+  // *before* retention returns empty, so stay well inside it (~11h at 5s ledgers).
+  const fallback = Math.max(latest.sequence - 8000, 1);
   const startLedger = sinceLedger && sinceLedger > fallback ? sinceLedger : fallback;
 
   let res: any;

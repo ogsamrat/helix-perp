@@ -1,0 +1,44 @@
+name: Keeper
+
+# Live keeper: every ~10 minutes runs one cycle against testnet — relays real
+# Reflector prices, advances funding, and liquidates underwater positions. This
+# keeps the deployed demo alive without an always-on server.
+#
+# Requires a repository secret KEEPER_SECRET (the keeper account's S… seed, which
+# holds the `keeper` role on market_registry). Contract addresses are read from
+# the committed deploy/testnet.json.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: keeper
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    name: Run one keeper cycle
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner != '' }}
+    defaults:
+      run:
+        working-directory: keeper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: keeper/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Keeper cycle
+        run: pnpm once
+        env:
+          KEEPER_SECRET: ${{ secrets.KEEPER_SECRET }}
+          RELAY_REFLECTOR: "true"
+          SIMULATE_PRICES: "true"
+          LOG_LEVEL: info

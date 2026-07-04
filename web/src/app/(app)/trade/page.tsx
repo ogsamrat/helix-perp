@@ -4,6 +4,7 @@ import { MarketStats } from "@/components/market/market-stats";
 import { PriceChart } from "@/components/market/price-chart";
 import { OrderTicket } from "@/components/trade/order-ticket";
 import { PositionsTable } from "@/components/positions/positions-table";
+import { OpenOrders } from "@/components/positions/open-orders";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -107,13 +108,21 @@ export default function TradePage() {
             </CardHeader>
             <PositionsTable />
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Open orders</CardTitle>
+              <span className="text-2xs text-ink-faint">limit · stop · take-profit</span>
+            </CardHeader>
+            <OpenOrders />
+          </Card>
         </div>
 
         <div className="lg:col-span-1">
           <Card className="lg:sticky lg:top-[72px]">
             <CardHeader>
               <CardTitle>Order</CardTitle>
-              <span className="text-2xs text-ink-faint">Market · {meta.ticker}</span>
+              <span className="text-2xs text-ink-faint">{meta.ticker}</span>
             </CardHeader>
             <CardBody>
               {cfg ? (

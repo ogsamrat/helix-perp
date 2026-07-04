@@ -82,6 +82,47 @@ pub enum EngineError {
     NotLiquidatable = 11,
     InvalidAmount = 12,
     PositionUnhealthy = 13,
+    OrderNotFound = 14,
+    NotOrderOwner = 15,
+    /// The order's trigger condition is not met at the current price.
+    OrderNotTriggerable = 16,
+    /// Trigger price / parameters are invalid.
+    InvalidTrigger = 17,
+}
+
+/// Direction a conditional order triggers in, relative to its `trigger_price`.
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TriggerDir {
+    /// Fires when the mark price rises to or above `trigger_price`.
+    Above,
+    /// Fires when the mark price falls to or below `trigger_price`.
+    Below,
+}
+
+/// A resting conditional order, executed by the keeper when its price trigger is
+/// crossed. Two shapes share one type, discriminated by `reduce`:
+/// * **entry** (`reduce == false`): opens a new position; `margin` + fee are
+///   escrowed with the vault at placement, so execution needs no trader signature.
+/// * **reduce / stop** (`reduce == true`): closes `reduce_position` (stop-loss /
+///   take-profit); no escrow — it settles the existing position's margin.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Order {
+    pub id: u64,
+    pub owner: Address,
+    pub market_id: u32,
+    pub side: Side,
+    pub margin: i128,
+    pub notional: i128,
+    pub trigger_price: i128,
+    pub dir: TriggerDir,
+    /// `false` = entry (open) order; `true` = stop that closes `reduce_position`.
+    pub reduce: bool,
+    /// The position id this stop closes (only meaningful when `reduce`).
+    pub reduce_position: u64,
+    pub max_slippage_bps: u32,
+    pub created_at: u64,
 }
 
 #[contracttype]
@@ -132,6 +173,9 @@ pub enum DataKey {
     LastFundingTs(u32),
     LongOi(u32),
     ShortOi(u32),
+    NextOrderId,
+    Order(u64),
+    UserOrders(Address),
 }
 
 #[contractevent]
@@ -198,6 +242,39 @@ pub struct FundingUpdated {
     pub timestamp: u64,
 }
 
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OrderPlaced {
+    #[topic]
+    pub trader: Address,
+    #[topic]
+    pub market_id: u32,
+    pub id: u64,
+    pub kind: Symbol,
+    pub trigger_price: i128,
+    pub notional: i128,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OrderCancelled {
+    #[topic]
+    pub trader: Address,
+    pub id: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OrderFilled {
+    #[topic]
+    pub trader: Address,
+    #[topic]
+    pub keeper: Address,
+    pub id: u64,
+    pub position_id: u64,
+    pub fill_price: i128,
+}
+
 #[contract]
 pub struct PerpEngine;
 
@@ -236,6 +313,32 @@ impl PerpEngine {
         let price = Self::price(e, &cfg);
         Self::check_slippage(e, price.price, ref_price, max_slippage_bps);
 
+        // Validate sizing *before* moving any funds, then escrow + materialise.
+        Self::validate_sizing(e, market_id, side, margin, notional, &cfg);
+        let fee = apply_bps(notional, cfg.taker_fee_bps);
+        Self::vault(e).lock_margin(&trader, &margin, &fee);
+        Self::create_position(
+            e,
+            &trader,
+            market_id,
+            side,
+            margin,
+            notional,
+            price.price,
+            fee,
+        )
+    }
+
+    /// Sizing invariants shared by `open_position` and `execute_order`, checked
+    /// against live open interest before any collateral moves.
+    fn validate_sizing(
+        e: &Env,
+        market_id: u32,
+        side: Side,
+        margin: i128,
+        notional: i128,
+        cfg: &MarketConfig,
+    ) {
         if notional < cfg.min_position_size {
             panic_with_error!(e, EngineError::BelowMinSize);
         }
@@ -249,10 +352,21 @@ impl PerpEngine {
         if side_oi + notional > cfg.max_oi {
             panic_with_error!(e, EngineError::ExceedsMaxOi);
         }
+    }
 
-        let fee = apply_bps(notional, cfg.taker_fee_bps);
-        Self::vault(e).lock_margin(&trader, &margin, &fee);
-
+    /// Write a validated position record, assuming `margin` (+ fee) is already
+    /// escrowed with the vault. Callers must `validate_sizing` first.
+    fn create_position(
+        e: &Env,
+        trader: &Address,
+        market_id: u32,
+        side: Side,
+        margin: i128,
+        notional: i128,
+        price: i128,
+        fee: i128,
+    ) -> u64 {
+        let side_oi = Self::oi(e, market_id, side);
         let id = Self::next_id(e);
         let pos = Position {
             id,
@@ -261,23 +375,23 @@ impl PerpEngine {
             side,
             margin,
             notional,
-            entry_price: price.price,
+            entry_price: price,
             entry_funding: Self::cum_funding(e, market_id),
             opened_at: e.ledger().timestamp(),
         };
         Self::store_position(e, &pos);
-        Self::add_user_position(e, &trader, id);
+        Self::add_user_position(e, trader, id);
         Self::set_oi(e, market_id, side, side_oi + notional);
         Self::bump(e);
 
         PositionOpened {
-            trader,
+            trader: trader.clone(),
             market_id,
             id,
             side,
             margin,
             notional,
-            entry_price: price.price,
+            entry_price: price,
             fee,
         }
         .publish(e);
@@ -287,6 +401,12 @@ impl PerpEngine {
     /// Fully close a position, settling PnL + funding + close fee with the vault.
     pub fn close_position(e: &Env, trader: Address, position_id: u64) {
         let pos = Self::owned_position(e, &trader, position_id);
+        Self::close_internal(e, &pos);
+    }
+
+    /// Close math + settlement for a position, independent of who triggered it —
+    /// shared by `close_position` (owner) and `execute_order` (keeper stop).
+    fn close_internal(e: &Env, pos: &Position) {
         let cfg = Self::market(e, pos.market_id);
         let price = Self::price(e, &cfg);
 
@@ -308,10 +428,10 @@ impl PerpEngine {
             pos.side,
             Self::oi(e, pos.market_id, pos.side) - pos.notional,
         );
-        Self::remove_position(e, &pos);
+        Self::remove_position(e, pos);
 
         PositionClosed {
-            trader,
+            trader: pos.owner.clone(),
             market_id: pos.market_id,
             id: pos.id,
             exit_price: price.price,
@@ -613,10 +733,229 @@ impl PerpEngine {
         rate_bps
     }
 
+    // ----------------------------------------------------------- conditional orders
+
+    /// Place a resting **entry** (limit) order. Margin + the taker fee are escrowed
+    /// with the vault immediately, so the keeper can fill it later without a trader
+    /// signature. Fires when the mark price crosses `trigger_price` in `dir`.
+    pub fn place_order(
+        e: &Env,
+        trader: Address,
+        market_id: u32,
+        side: Side,
+        margin: i128,
+        notional: i128,
+        trigger_price: i128,
+        dir: TriggerDir,
+        max_slippage_bps: u32,
+    ) -> u64 {
+        trader.require_auth();
+        if margin <= 0 || notional <= 0 {
+            panic_with_error!(e, EngineError::InvalidAmount);
+        }
+        if trigger_price <= 0 {
+            panic_with_error!(e, EngineError::InvalidTrigger);
+        }
+        let cfg = Self::market(e, market_id);
+        Self::ensure_active(e, &cfg);
+        // Sanity-check sizing up front (re-checked at the execution price on fill).
+        Self::validate_sizing(e, market_id, side, margin, notional, &cfg);
+
+        let fee = apply_bps(notional, cfg.taker_fee_bps);
+        Self::vault(e).lock_margin(&trader, &margin, &fee);
+
+        let id = Self::next_order_id(e);
+        let order = Order {
+            id,
+            owner: trader.clone(),
+            market_id,
+            side,
+            margin,
+            notional,
+            trigger_price,
+            dir,
+            reduce: false,
+            reduce_position: 0,
+            max_slippage_bps,
+            created_at: e.ledger().timestamp(),
+        };
+        Self::store_order(e, &order);
+        Self::add_user_order(e, &trader, id);
+        Self::bump(e);
+        OrderPlaced {
+            trader,
+            market_id,
+            id,
+            kind: Symbol::new(e, "limit"),
+            trigger_price,
+            notional,
+        }
+        .publish(e);
+        id
+    }
+
+    /// Attach a **stop-loss / take-profit** to an existing position: the keeper
+    /// closes it when the mark price crosses `trigger_price` in `dir`. No escrow —
+    /// it settles the position's existing margin on fill.
+    pub fn place_stop(
+        e: &Env,
+        trader: Address,
+        position_id: u64,
+        trigger_price: i128,
+        dir: TriggerDir,
+    ) -> u64 {
+        let pos = Self::owned_position(e, &trader, position_id);
+        if trigger_price <= 0 {
+            panic_with_error!(e, EngineError::InvalidTrigger);
+        }
+        let id = Self::next_order_id(e);
+        let order = Order {
+            id,
+            owner: trader.clone(),
+            market_id: pos.market_id,
+            side: pos.side,
+            margin: 0,
+            notional: pos.notional,
+            trigger_price,
+            dir,
+            reduce: true,
+            reduce_position: position_id,
+            max_slippage_bps: 0,
+            created_at: e.ledger().timestamp(),
+        };
+        Self::store_order(e, &order);
+        Self::add_user_order(e, &trader, id);
+        Self::bump(e);
+        OrderPlaced {
+            trader,
+            market_id: pos.market_id,
+            id,
+            kind: Symbol::new(e, "stop"),
+            trigger_price,
+            notional: pos.notional,
+        }
+        .publish(e);
+        id
+    }
+
+    /// Cancel a resting order. For entry orders the escrowed margin + fee are
+    /// refunded to the owner (the LP nets to zero on the round-trip).
+    pub fn cancel_order(e: &Env, trader: Address, order_id: u64) {
+        let order = Self::order(e, order_id);
+        trader.require_auth();
+        if order.owner != trader {
+            panic_with_error!(e, EngineError::NotOrderOwner);
+        }
+        if !order.reduce {
+            let cfg = Self::market(e, order.market_id);
+            let fee = apply_bps(order.notional, cfg.taker_fee_bps);
+            Self::vault(e).settle(&trader, &order.margin, &(order.margin + fee));
+        }
+        Self::remove_order(e, &order);
+        OrderCancelled {
+            trader,
+            id: order_id,
+        }
+        .publish(e);
+    }
+
+    /// Keeper: fill a resting order whose trigger has been crossed. Entry orders
+    /// open a position from the escrowed margin; stop orders close the referenced
+    /// position. Reverts `OrderNotTriggerable` if the price hasn't crossed yet.
+    pub fn execute_order(e: &Env, keeper: Address, order_id: u64) {
+        keeper.require_auth();
+        if !Self::registry(e).is_keeper(&keeper) {
+            panic_with_error!(e, EngineError::NotKeeper);
+        }
+        let order = Self::order(e, order_id);
+        let cfg = Self::market(e, order.market_id);
+        Self::ensure_active(e, &cfg);
+        let price = Self::price(e, &cfg);
+        if !Self::triggered(order.dir, price.price, order.trigger_price) {
+            panic_with_error!(e, EngineError::OrderNotTriggerable);
+        }
+
+        if !order.reduce {
+            // Entry: margin + fee were escrowed at placement.
+            Self::check_slippage(e, price.price, order.trigger_price, order.max_slippage_bps);
+            Self::validate_sizing(
+                e,
+                order.market_id,
+                order.side,
+                order.margin,
+                order.notional,
+                &cfg,
+            );
+            let fee = apply_bps(order.notional, cfg.taker_fee_bps);
+            let position_id = Self::create_position(
+                e,
+                &order.owner,
+                order.market_id,
+                order.side,
+                order.margin,
+                order.notional,
+                price.price,
+                fee,
+            );
+            Self::remove_order(e, &order);
+            OrderFilled {
+                trader: order.owner,
+                keeper,
+                id: order_id,
+                position_id,
+                fill_price: price.price,
+            }
+            .publish(e);
+        } else {
+            // Stop: close the referenced position if it still exists + is owned.
+            let pos = Self::position(e, order.reduce_position);
+            if pos.owner != order.owner {
+                panic_with_error!(e, EngineError::NotOrderOwner);
+            }
+            Self::close_internal(e, &pos);
+            Self::remove_order(e, &order);
+            OrderFilled {
+                trader: order.owner,
+                keeper,
+                id: order_id,
+                position_id: order.reduce_position,
+                fill_price: price.price,
+            }
+            .publish(e);
+        }
+    }
+
     // ------------------------------------------------------------------ views
 
     pub fn get_position(e: &Env, id: u64) -> Position {
         Self::position(e, id)
+    }
+
+    pub fn get_order(e: &Env, id: u64) -> Order {
+        Self::order(e, id)
+    }
+
+    pub fn user_order_ids(e: &Env, user: Address) -> Vec<u64> {
+        e.storage()
+            .persistent()
+            .get(&DataKey::UserOrders(user))
+            .unwrap_or(Vec::new(e))
+    }
+
+    /// All resting orders for a user (entry limits + stops).
+    pub fn user_orders(e: &Env, user: Address) -> Vec<Order> {
+        let ids = Self::user_order_ids(e, user);
+        let mut out = Vec::new(e);
+        for id in ids.iter() {
+            if let Some(o) = e
+                .storage()
+                .persistent()
+                .get::<_, Order>(&DataKey::Order(id))
+            {
+                out.push_back(o);
+            }
+        }
+        out
     }
 
     pub fn user_position_ids(e: &Env, user: Address) -> Vec<u64> {
@@ -808,6 +1147,64 @@ impl PerpEngine {
         e.storage()
             .persistent()
             .extend_ttl(&key, BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+
+    // ---- conditional-order storage ----
+
+    /// True when `price` has crossed `trigger` in the order's direction.
+    fn triggered(dir: TriggerDir, price: i128, trigger: i128) -> bool {
+        match dir {
+            TriggerDir::Above => price >= trigger,
+            TriggerDir::Below => price <= trigger,
+        }
+    }
+
+    fn order(e: &Env, id: u64) -> Order {
+        e.storage()
+            .persistent()
+            .get(&DataKey::Order(id))
+            .unwrap_or_else(|| panic_with_error!(e, EngineError::OrderNotFound))
+    }
+
+    fn next_order_id(e: &Env) -> u64 {
+        let id: u64 = e
+            .storage()
+            .instance()
+            .get(&DataKey::NextOrderId)
+            .unwrap_or(0);
+        e.storage().instance().set(&DataKey::NextOrderId, &(id + 1));
+        id
+    }
+
+    fn store_order(e: &Env, order: &Order) {
+        let key = DataKey::Order(order.id);
+        e.storage().persistent().set(&key, order);
+        e.storage()
+            .persistent()
+            .extend_ttl(&key, BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+
+    fn add_user_order(e: &Env, user: &Address, id: u64) {
+        let key = DataKey::UserOrders(user.clone());
+        let mut ids: Vec<u64> = e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
+        ids.push_back(id);
+        e.storage().persistent().set(&key, &ids);
+        e.storage()
+            .persistent()
+            .extend_ttl(&key, BUMP_THRESHOLD, BUMP_AMOUNT);
+    }
+
+    fn remove_order(e: &Env, order: &Order) {
+        e.storage().persistent().remove(&DataKey::Order(order.id));
+        let key = DataKey::UserOrders(order.owner.clone());
+        let ids: Vec<u64> = e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
+        let mut next = Vec::new(e);
+        for id in ids.iter() {
+            if id != order.id {
+                next.push_back(id);
+            }
+        }
+        e.storage().persistent().set(&key, &next);
     }
 
     fn cum_funding(e: &Env, market_id: u32) -> i128 {

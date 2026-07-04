@@ -1,5 +1,5 @@
 #![cfg(test)]
-use crate::{EngineError, PerpEngine, PerpEngineClient};
+use crate::{EngineError, PerpEngine, PerpEngineClient, TriggerDir};
 use collateral_vault::{CollateralVault, CollateralVaultClient};
 use helix_shared::{MarketConfig, ReflectorAsset, Side};
 use market_registry::{MarketRegistry, MarketRegistryClient};
@@ -286,4 +286,120 @@ fn add_and_remove_margin() {
     assert_eq!(w.engine.get_position(&id).margin, 150 * ONE);
     w.engine.remove_margin(&trader, &id, &(30 * ONE));
     assert_eq!(w.engine.get_position(&id).margin, 120 * ONE);
+}
+
+// ----------------------------------------------------------- conditional orders
+
+#[test]
+fn limit_order_escrows_then_fills_when_triggered() {
+    let w = world();
+    let trader = w.funded_trader(200 * ONE);
+    // Buy-the-dip limit: fill a 10x long when price falls to 2300.
+    let oid = w.engine.place_order(
+        &trader,
+        &MARKET,
+        &Side::Long,
+        &(100 * ONE),
+        &(1_000 * ONE),
+        &(2_300 * ONE),
+        &TriggerDir::Below,
+        &0,
+    );
+    // margin 100 + fee 1 escrowed at placement.
+    assert_eq!(w.usdc.balance(&trader), 99 * ONE);
+
+    // Not yet crossed (price 2400 > 2300) -> not fillable.
+    assert_eq!(
+        w.engine.try_execute_order(&w.keeper, &oid),
+        Err(Ok(EngineError::OrderNotTriggerable.into()))
+    );
+
+    w.set_price(2_300); // cross the trigger
+    w.engine.execute_order(&w.keeper, &oid);
+
+    // Order gone; a position opened at the trigger price from escrowed margin.
+    assert!(w.engine.try_get_order(&oid).is_err());
+    assert_eq!(w.engine.long_oi(&MARKET), 1_000 * ONE);
+    assert_eq!(w.usdc.balance(&trader), 99 * ONE); // no extra pull on fill
+    assert_eq!(w.engine.user_orders(&trader).len(), 0);
+}
+
+#[test]
+fn cancel_limit_order_refunds_escrow_and_nets_lp_to_zero() {
+    let w = world();
+    let lp_before = w.vault.lp_cash();
+    let trader = w.funded_trader(200 * ONE);
+    let oid = w.engine.place_order(
+        &trader,
+        &MARKET,
+        &Side::Long,
+        &(100 * ONE),
+        &(1_000 * ONE),
+        &(2_300 * ONE),
+        &TriggerDir::Below,
+        &0,
+    );
+    assert_eq!(w.usdc.balance(&trader), 99 * ONE);
+
+    w.engine.cancel_order(&trader, &oid);
+    // Full refund of margin + fee; LP nets to zero over the round-trip.
+    assert_eq!(w.usdc.balance(&trader), 200 * ONE);
+    assert_eq!(w.vault.lp_cash(), lp_before);
+    assert!(w.engine.try_get_order(&oid).is_err());
+}
+
+#[test]
+fn stop_loss_closes_position_when_triggered() {
+    let w = world();
+    let trader = w.funded_trader(101 * ONE);
+    let id = w.open_long(&trader, 100 * ONE, 1_000 * ONE); // entry 2400
+
+    // Stop-loss: close the long if price falls to 2300.
+    let sid = w
+        .engine
+        .place_stop(&trader, &id, &(2_300 * ONE), &TriggerDir::Below);
+    assert_eq!(w.engine.user_orders(&trader).len(), 1);
+
+    // Above the stop -> not fillable.
+    assert_eq!(
+        w.engine.try_execute_order(&w.keeper, &sid),
+        Err(Ok(EngineError::OrderNotTriggerable.into()))
+    );
+
+    w.set_price(2_300);
+    w.engine.execute_order(&w.keeper, &sid);
+
+    // Position closed, stop consumed, OI cleared.
+    assert!(w.engine.try_get_position(&id).is_err());
+    assert!(w.engine.try_get_order(&sid).is_err());
+    assert_eq!(w.engine.long_oi(&MARKET), 0);
+}
+
+#[test]
+fn orders_are_rbac_and_owner_gated() {
+    let w = world();
+    let trader = w.funded_trader(200 * ONE);
+    let oid = w.engine.place_order(
+        &trader,
+        &MARKET,
+        &Side::Long,
+        &(100 * ONE),
+        &(1_000 * ONE),
+        &(2_300 * ONE),
+        &TriggerDir::Below,
+        &0,
+    );
+    w.set_price(2_300);
+
+    let intruder = Address::generate(&w.e);
+    // Only a keeper may execute.
+    assert_eq!(
+        w.engine.try_execute_order(&intruder, &oid),
+        Err(Ok(EngineError::NotKeeper.into()))
+    );
+    // Only the owner may cancel.
+    assert_eq!(
+        w.engine.try_cancel_order(&intruder, &oid),
+        Err(Ok(EngineError::NotOrderOwner.into()))
+    );
 }

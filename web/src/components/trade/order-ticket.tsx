@@ -14,20 +14,28 @@ import { previewOpen } from "@/lib/trade";
 import { usePrefs } from "@/lib/ui/prefs";
 import { useWallet } from "@/lib/wallet/store";
 
+type OrderType = "Market" | "Limit";
+
 export function OrderTicket({ meta, cfg, price }: { meta: MarketMeta; cfg: MarketConfig; price: number }) {
   const { address, connect, connecting } = useWallet();
   const action = useChainAction();
   const balance = useUsdcBalance();
   const slippageBps = usePrefs((s) => s.slippageBps);
 
+  const [orderType, setOrderType] = useState<OrderType>("Market");
   const [side, setSide] = useState<Side>("Long");
   const [margin, setMargin] = useState("");
+  const [trigger, setTrigger] = useState("");
   const [leverage, setLeverage] = useState(Math.min(5, cfg.maxLeverage));
 
   const marginUnits = parseFloat(margin) || 0;
+  const triggerUnits = parseFloat(trigger) || 0;
+  const isLimit = orderType === "Limit";
+  // For a limit order the position would open at the trigger, so preview there.
+  const effPrice = isLimit && triggerUnits > 0 ? triggerUnits : price;
   const preview = useMemo(
-    () => previewOpen({ cfg, price, marginUnits, leverage, side }),
-    [cfg, price, marginUnits, leverage, side],
+    () => previewOpen({ cfg, price: effPrice, marginUnits, leverage, side }),
+    [cfg, effPrice, marginUnits, leverage, side],
   );
   const balanceUnits = balance.data !== undefined ? toUnits(balance.data) : 0;
   const totalCost = marginUnits + preview.fee;
@@ -36,11 +44,13 @@ export function OrderTicket({ meta, cfg, price }: { meta: MarketMeta; cfg: Marke
     ? null
     : marginUnits <= 0
       ? "Enter an amount"
-      : !preview.meetsMin
-        ? `Min size ${fmtUsd(cfg.minPositionSize)}`
-        : totalCost > balanceUnits + 1e-6
-          ? "Insufficient USDC"
-          : null;
+      : isLimit && triggerUnits <= 0
+        ? "Set a trigger price"
+        : !preview.meetsMin
+          ? `Min size ${fmtUsd(cfg.minPositionSize)}`
+          : totalCost > balanceUnits + 1e-6
+            ? "Insufficient USDC"
+            : null;
 
   const setMax = () => {
     const denom = 1 + (leverage * cfg.takerFeeBps) / 10_000;
@@ -49,22 +59,52 @@ export function OrderTicket({ meta, cfg, price }: { meta: MarketMeta; cfg: Marke
 
   const submit = async () => {
     if (!address) return;
-    await action.mutateAsync({
-      call: calls.openPosition(
-        address,
-        cfg.id,
-        side,
-        toScaled(marginUnits),
-        toScaled(preview.notional),
-        BigInt(Math.round(price * 1e7)),
-        slippageBps,
-      ),
-    });
+    if (isLimit) {
+      // "Fill when the market reaches my trigger": above if the trigger is over
+      // the current price, below if under.
+      const dir = triggerUnits >= price ? "Above" : "Below";
+      await action.mutateAsync({
+        call: calls.placeOrder(
+          address,
+          cfg.id,
+          side,
+          toScaled(marginUnits),
+          toScaled(preview.notional),
+          toScaled(triggerUnits),
+          dir,
+          slippageBps,
+        ),
+      });
+      setTrigger("");
+    } else {
+      await action.mutateAsync({
+        call: calls.openPosition(
+          address,
+          cfg.id,
+          side,
+          toScaled(marginUnits),
+          toScaled(preview.notional),
+          BigInt(Math.round(price * 1e7)),
+          slippageBps,
+        ),
+      });
+    }
     setMargin("");
   };
 
   return (
     <div className="space-y-4">
+      <Segmented<OrderType>
+        options={[
+          { label: "Market", value: "Market" },
+          { label: "Limit", value: "Limit" },
+        ]}
+        value={orderType}
+        onChange={setOrderType}
+        size="sm"
+        className="w-full [&>button]:flex-1"
+      />
+
       <Segmented<Side>
         options={[
           { label: "Long", value: "Long" },
@@ -87,10 +127,22 @@ export function OrderTicket({ meta, cfg, price }: { meta: MarketMeta; cfg: Marke
         }
       />
 
+      {isLimit && (
+        <AmountField
+          label="Trigger price"
+          value={trigger}
+          onChange={setTrigger}
+          hint={<span className="text-ink-faint">Mark {fmtPrice(BigInt(Math.round(price * 1e7)), meta.priceDecimals)}</span>}
+        />
+      )}
+
       <LeverageSlider value={leverage} onChange={setLeverage} max={cfg.maxLeverage} />
 
       <div className="rounded-lg border border-hairline bg-canvas p-3">
-        <StatRow label="Entry price" value={fmtPrice(BigInt(Math.round(price * 1e7)), meta.priceDecimals)} />
+        <StatRow
+          label={isLimit ? "Trigger price" : "Entry price"}
+          value={fmtPrice(BigInt(Math.round(effPrice * 1e7)), meta.priceDecimals)}
+        />
         <StatRow label="Position size" value={fmtUsd(toScaled(preview.notional))} />
         <StatRow label={`Est. fee (${fmtBps(cfg.takerFeeBps)})`} value={fmtUsd(toScaled(preview.fee))} />
         <StatRow
@@ -119,7 +171,7 @@ export function OrderTicket({ meta, cfg, price }: { meta: MarketMeta; cfg: Marke
           loading={action.isPending}
           onClick={submit}
         >
-          {reason ?? `${side} ${meta.ticker}`}
+          {reason ?? (isLimit ? `Place ${side} limit` : `${side} ${meta.ticker}`)}
         </Button>
       )}
     </div>

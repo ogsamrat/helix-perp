@@ -4,6 +4,7 @@ import { MARKETS } from "@/config";
 import * as api from "@/lib/stellar/contracts";
 import type { Call } from "@/lib/stellar/contracts";
 import { fetchEvents } from "@/lib/stellar/events";
+import { fetchLeaderboard } from "@/lib/stellar/indexer";
 import { useTxStore, type SubmitResult } from "@/lib/tx/store";
 import { useWallet } from "@/lib/wallet/store";
 
@@ -59,6 +60,15 @@ export function useUsdcBalance() {
 
 export function useEvents() {
   return useQuery({ queryKey: ["events"], queryFn: () => fetchEvents(), refetchInterval: 7_000 });
+}
+
+export function useLeaderboard() {
+  return useQuery({
+    queryKey: ["leaderboard"],
+    queryFn: fetchLeaderboard,
+    staleTime: 30_000,
+    refetchInterval: 45_000,
+  });
 }
 
 const DEFAULT_INVALIDATE = ["positions", "vault", "balance", "shares", "oi", "events", "prices"];

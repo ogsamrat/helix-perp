@@ -12,6 +12,8 @@ export const arg = {
   bool: (b: boolean) => xdr.ScVal.scvBool(b),
   /** Unit-variant enum (e.g. Side::Long) -> ScVec([Symbol]). */
   side: (s: Side) => xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(s)]),
+  /** TriggerDir::Above | Below -> ScVec([Symbol]). */
+  dir: (d: "Above" | "Below") => xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(d)]),
 };
 
 /** Normalise a decoded contracttype enum to its tag string. */

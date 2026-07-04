@@ -39,6 +39,16 @@ export function usePositions() {
   });
 }
 
+export function useOrders() {
+  const address = useWallet((s) => s.address);
+  return useQuery({
+    queryKey: ["orders", address],
+    queryFn: () => api.getUserOrders(address!),
+    enabled: !!address,
+    refetchInterval: 6_000,
+  });
+}
+
 export function useVaultShares() {
   const address = useWallet((s) => s.address);
   return useQuery({
@@ -71,7 +81,16 @@ export function useLeaderboard() {
   });
 }
 
-const DEFAULT_INVALIDATE = ["positions", "vault", "balance", "shares", "oi", "events", "prices"];
+const DEFAULT_INVALIDATE = [
+  "positions",
+  "orders",
+  "vault",
+  "balance",
+  "shares",
+  "oi",
+  "events",
+  "prices",
+];
 
 /** Submit a contract call through the tx-lifecycle, then refresh chain queries. */
 export function useChainAction() {

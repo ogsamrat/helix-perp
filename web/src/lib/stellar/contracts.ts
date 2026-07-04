@@ -3,7 +3,15 @@ import { xdr } from "@stellar/stellar-sdk";
 import { CONFIG } from "@/config";
 import { readContract } from "./client";
 import { arg, tagOf } from "./scval";
-import type { MarketConfig, OraclePrice, PositionView, Side, VaultStats } from "./types";
+import type {
+  MarketConfig,
+  OraclePrice,
+  OrderView,
+  PositionView,
+  Side,
+  TriggerDir,
+  VaultStats,
+} from "./types";
 
 const C = CONFIG.contracts;
 
@@ -30,6 +38,23 @@ function decodeMarket(o: any): MarketConfig {
     minPositionSize: BigInt(o.min_position_size),
     maxFundingRateBps: Number(o.max_funding_rate_bps),
     paused: Boolean(o.paused),
+  };
+}
+
+function decodeOrder(o: any): OrderView {
+  return {
+    id: BigInt(o.id),
+    owner: String(o.owner),
+    marketId: Number(o.market_id),
+    side: tagOf(o.side) as Side,
+    margin: BigInt(o.margin),
+    notional: BigInt(o.notional),
+    triggerPrice: BigInt(o.trigger_price),
+    dir: tagOf(o.dir) as TriggerDir,
+    reduce: Boolean(o.reduce),
+    reducePosition: BigInt(o.reduce_position),
+    maxSlippageBps: Number(o.max_slippage_bps),
+    createdAt: Number(o.created_at),
   };
 }
 
@@ -91,6 +116,11 @@ export async function getUserPositions(owner: string): Promise<PositionView[]> {
 export async function getPositionView(id: bigint): Promise<PositionView> {
   const o = await readContract<any>(C.perpEngine, "position_view", [arg.u64(id)]);
   return decodePosition(o);
+}
+
+export async function getUserOrders(owner: string): Promise<OrderView[]> {
+  const raw = await readContract<any[]>(C.perpEngine, "user_orders", [arg.addr(owner)]);
+  return (raw ?? []).map(decodeOrder);
 }
 
 export async function getMarketOi(marketId: number): Promise<{ long: bigint; short: bigint; funding: bigint }> {
@@ -167,6 +197,42 @@ export const calls = {
     method: "close_position",
     args: [arg.addr(trader), arg.u64(id)],
     label: "Close position",
+  }),
+  placeOrder: (
+    trader: string,
+    marketId: number,
+    side: Side,
+    margin: bigint,
+    notional: bigint,
+    triggerPrice: bigint,
+    dir: TriggerDir,
+    slippageBps: number,
+  ): Call => ({
+    contractId: C.perpEngine,
+    method: "place_order",
+    args: [
+      arg.addr(trader),
+      arg.u32(marketId),
+      arg.side(side),
+      arg.i128(margin),
+      arg.i128(notional),
+      arg.i128(triggerPrice),
+      arg.dir(dir),
+      arg.u32(slippageBps),
+    ],
+    label: `Limit ${side} ${marketId}`,
+  }),
+  placeStop: (trader: string, positionId: bigint, triggerPrice: bigint, dir: TriggerDir): Call => ({
+    contractId: C.perpEngine,
+    method: "place_stop",
+    args: [arg.addr(trader), arg.u64(positionId), arg.i128(triggerPrice), arg.dir(dir)],
+    label: "Set stop",
+  }),
+  cancelOrder: (trader: string, id: bigint): Call => ({
+    contractId: C.perpEngine,
+    method: "cancel_order",
+    args: [arg.addr(trader), arg.u64(id)],
+    label: "Cancel order",
   }),
   addMargin: (trader: string, id: bigint, amount: bigint): Call => ({
     contractId: C.perpEngine,

@@ -35,6 +35,25 @@ export interface PositionView {
   marginRatioBps: bigint;
 }
 
+export type TriggerDir = "Above" | "Below";
+
+/** A resting conditional order (entry limit, or stop-loss/take-profit). */
+export interface OrderView {
+  id: bigint;
+  owner: string;
+  marketId: number;
+  side: Side;
+  margin: bigint;
+  notional: bigint;
+  triggerPrice: bigint;
+  dir: TriggerDir;
+  /** false = entry (open) order; true = stop that closes `reducePosition`. */
+  reduce: boolean;
+  reducePosition: bigint;
+  maxSlippageBps: number;
+  createdAt: number;
+}
+
 export interface OraclePrice {
   price: bigint;
   timestamp: number;

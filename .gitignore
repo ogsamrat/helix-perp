@@ -43,3 +43,6 @@ pnpm-debug.log*
 # Keeper
 keeper/.env
 keeper/state.json
+
+# local Claude Code config / skills — not part of the project
+.claude/

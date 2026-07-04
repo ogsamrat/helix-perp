@@ -54,6 +54,9 @@ Perpetual futures are the highest-volume product in DeFi, yet they almost exclus
 - **Four-contract protocol** with **three live cross-contract calls on every trade** (registry &rarr; oracle &rarr; vault).
 - **Custody isolated from logic** — funds in the vault, trading in the engine, control in the registry; each upgradeable independently.
 - **Hardened oracle** — a swappable Reflector adapter that rejects stale prices, bounds tick-to-tick deviation and refuses non-positive prices, surfaced as typed contract errors.
+- **Real Reflector prices** — the keeper relays live prices from Reflector's decentralised SEP-40 testnet oracle (XLM, EUR) into the protocol each cycle, clamp-converged to stay inside the deviation guard.
+- **On-chain leaderboard** — traders ranked by realized PnL and protocol stats, aggregated live from engine events straight off Soroban RPC. No backend, no database.
+- **Live keeper** — a scheduled GitHub Action runs one keeper cycle every ~10 min (relay prices, advance funding, liquidate) so the deployed demo stays alive with no always-on server.
 - **Shared LP vault** — one USDC pool is the counterparty to every position, with ERC-4626-style shares.
 - **Real-time terminal** — positions, funding and liquidations stream from Soroban events into a premium UI with a full sign &rarr; submit &rarr; confirm transaction lifecycle.
 - **Verified** — 33 Rust contract tests and 11 web tests passing, six contracts deployed and seeded on testnet, and a live Vercel deployment.

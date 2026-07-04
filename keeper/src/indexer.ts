@@ -31,6 +31,13 @@ const CLOSE_EVENTS = new Set([
   "position_liquidated",
   "PositionLiquidated",
 ]);
+const ORDER_OPEN_EVENTS = new Set(["order_placed", "OrderPlaced"]);
+const ORDER_CLOSE_EVENTS = new Set([
+  "order_filled",
+  "OrderFilled",
+  "order_cancelled",
+  "OrderCancelled",
+]);
 
 /** Max events to fetch per getEvents page (RPC hard cap is 10_000). */
 const EVENTS_PAGE_LIMIT = 200;
@@ -42,6 +49,8 @@ interface PersistedState {
   cursor: string | null;
   /** Open position ids as strings (u64 may exceed Number.MAX_SAFE_INTEGER). */
   openPositionIds: string[];
+  /** Resting (unfilled) conditional order ids as strings. */
+  openOrderIds?: string[];
   /** Last ledger we observed an event in (diagnostic only). */
   lastLedger: number;
   updatedAt: string;
@@ -60,6 +69,7 @@ export class Indexer {
   private cursor: string | null = null;
   private lastLedger = 0;
   private readonly openIds = new Set<bigint>();
+  private readonly orderIds = new Set<bigint>();
 
   constructor(
     private readonly client: StellarClient,
@@ -85,6 +95,14 @@ export class Indexer {
           // skip non-numeric ids
         }
       }
+      this.orderIds.clear();
+      for (const idStr of parsed.openOrderIds ?? []) {
+        try {
+          this.orderIds.add(BigInt(idStr));
+        } catch {
+          // skip non-numeric ids
+        }
+      }
       log.info("indexer state loaded", {
         cursor: this.cursor,
         openCount: this.openIds.size,
@@ -100,6 +118,7 @@ export class Indexer {
     const state: PersistedState = {
       cursor: this.cursor,
       openPositionIds: [...this.openIds].map((id) => id.toString()),
+      openOrderIds: [...this.orderIds].map((id) => id.toString()),
       lastLedger: this.lastLedger,
       updatedAt: new Date().toISOString(),
     };
@@ -115,6 +134,11 @@ export class Indexer {
   /** Snapshot of currently-open position ids. */
   openPositionIds(): bigint[] {
     return [...this.openIds];
+  }
+
+  /** Snapshot of resting (unfilled) conditional order ids. */
+  openOrderIds(): bigint[] {
+    return [...this.orderIds];
   }
 
   /**
@@ -180,6 +204,18 @@ export class Indexer {
     if (name === undefined) return;
 
     if (event.ledger > this.lastLedger) this.lastLedger = event.ledger;
+
+    // Conditional-order lifecycle (id lives in the event body, like positions).
+    const isOrderOpen = ORDER_OPEN_EVENTS.has(name);
+    const isOrderClose = ORDER_CLOSE_EVENTS.has(name);
+    if (isOrderOpen || isOrderClose) {
+      const oid = this.extractPositionId(event.value);
+      if (oid === undefined) return;
+      if (isOrderOpen) this.orderIds.add(oid);
+      else this.orderIds.delete(oid);
+      log.debug("order tracked", { id: oid.toString(), name, ledger: event.ledger });
+      return;
+    }
 
     const isOpen = OPEN_EVENTS.has(name);
     const isClose = CLOSE_EVENTS.has(name);

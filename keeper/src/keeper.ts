@@ -19,6 +19,7 @@ import { Indexer } from "./indexer.js";
 import { MARKETS, ORACLE_DECIMALS, priceToOracleI128 } from "./markets.js";
 import type { Market } from "./markets.js";
 import type { KeeperConfig } from "./config.js";
+import { REFLECTOR_SYMBOLS, readReflectorPrice } from "./reflector.js";
 import { captureError, log } from "./logger.js";
 
 /** Decoded `PositionView`. i128 fields decode to bigint via scValToNative. */
@@ -44,6 +45,13 @@ export interface PositionView {
 const MAX_TICK_FRACTION = 0.01;
 /** Soft band keeping the simulated price near its base (+/- 15%). */
 const MAX_DRIFT_FRACTION = 0.15;
+/**
+ * Max fractional step per cycle when converging a relayed real price toward its
+ * target — stays comfortably inside the oracle adapter's deviation guard so a
+ * large first move (e.g. XLM 0.12 -> 0.21) is walked in over a couple of cycles
+ * instead of tripping `PriceDeviationTooHigh`.
+ */
+const MAX_RELAY_STEP_FRACTION = 0.35;
 
 export interface CycleResult {
   fundingUpdated: number;
@@ -52,6 +60,7 @@ export interface CycleResult {
   liquidated: number;
   notLiquidatable: number;
   pricesSimulated: number;
+  pricesRelayed: number;
 }
 
 export class Keeper {
@@ -73,13 +82,16 @@ export class Keeper {
       liquidated: 0,
       notLiquidatable: 0,
       pricesSimulated: 0,
+      pricesRelayed: 0,
     };
 
     const startedAt = Date.now();
     log.info("cycle start", { keeper: this.client.keeperPublicKey });
 
-    if (this.config.simulatePrices) {
-      result.pricesSimulated = await this.simulatePrices();
+    // Price source, per market: relay a real Reflector price where a testnet
+    // feed exists, otherwise fall back to the bounded simulated walk.
+    if (this.config.relayReflector || this.config.simulatePrices) {
+      await this.refreshPrices(result);
     }
 
     await this.updateAllFunding(result);
@@ -97,26 +109,57 @@ export class Keeper {
     return result;
   }
 
-  // --- step 1: price simulation --------------------------------------------
+  // --- step 1: price source (relay real Reflector, else simulate) ----------
 
-  private async simulatePrices(): Promise<number> {
-    let count = 0;
+  private async refreshPrices(result: CycleResult): Promise<void> {
     for (const market of MARKETS) {
+      const symbol = this.config.relayReflector ? REFLECTOR_SYMBOLS[market.feed] : null;
       try {
-        const next = this.nextSimPrice(market);
+        let next: number;
+        let relayed = false;
+
+        if (symbol) {
+          const real = await readReflectorPrice(this.client, this.config.reflectorOracleId, symbol);
+          if (real) {
+            next = this.stepToward(market, Number(real.price14) / 10 ** ORACLE_DECIMALS);
+            relayed = true;
+          } else {
+            if (!this.config.simulatePrices) continue; // no feed, no sim -> leave as-is
+            next = this.nextSimPrice(market);
+          }
+        } else {
+          if (!this.config.simulatePrices) continue;
+          next = this.nextSimPrice(market);
+        }
+
         const scaled = priceToOracleI128(next, ORACLE_DECIMALS);
         await this.client.invoke(this.config.mockOracleId, "set_price", [
           StellarClient.reflectorOtherScVal(market.feed),
           StellarClient.i128ScVal(scaled),
         ]);
         this.lastSimPrice.set(market.id, next);
-        count++;
-        log.debug("price nudged", { market: market.label, price: next });
+        if (relayed) result.pricesRelayed++;
+        else result.pricesSimulated++;
+        log.debug(relayed ? "price relayed" : "price nudged", { market: market.label, price: next });
       } catch (err) {
         captureError(err, { scope: "set_price", market: market.label });
       }
     }
-    return count;
+  }
+
+  /**
+   * Move the current on-chain price toward a real target, capped at
+   * `MAX_RELAY_STEP_FRACTION` per cycle so a large gap is walked in gradually
+   * without tripping the adapter's deviation guard.
+   */
+  private stepToward(market: Market, target: number): number {
+    const current = this.lastSimPrice.get(market.id) ?? market.basePrice;
+    const maxStep = current * MAX_RELAY_STEP_FRACTION;
+    const delta = Math.max(-maxStep, Math.min(maxStep, target - current));
+    const next = current + delta;
+    const dp = next >= 100 ? 2 : 6;
+    const factor = 10 ** dp;
+    return Math.round(next * factor) / factor;
   }
 
   /** Bounded random walk around the base price, max ~1% per tick. */

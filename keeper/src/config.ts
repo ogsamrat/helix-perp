@@ -16,6 +16,7 @@ import { dirname, resolve } from "node:path";
 import dotenv from "dotenv";
 import { Keypair } from "@stellar/stellar-sdk";
 import { log } from "./logger.js";
+import { DEFAULT_REFLECTOR_ORACLE } from "./reflector.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -46,6 +47,10 @@ export interface KeeperConfig {
   readonly oracleAdapterId: string;
   readonly pollIntervalMs: number;
   readonly simulatePrices: boolean;
+  /** Relay real prices from the Reflector oracle into the protocol oracle. */
+  readonly relayReflector: boolean;
+  /** Address of the upstream Reflector oracle to read from. */
+  readonly reflectorOracleId: string;
   readonly eventLookbackLedgers: number;
   /** Absolute path to the on-disk cursor/open-id state file. */
   readonly statePath: string;
@@ -169,6 +174,8 @@ export function loadConfig(): KeeperConfig {
     ),
     pollIntervalMs: parsePositiveInt(env.POLL_INTERVAL_MS, DEFAULT_POLL_INTERVAL_MS, "POLL_INTERVAL_MS"),
     simulatePrices: parseBool(env.SIMULATE_PRICES, false),
+    relayReflector: parseBool(env.RELAY_REFLECTOR, false),
+    reflectorOracleId: (env.REFLECTOR_ORACLE_ID ?? DEFAULT_REFLECTOR_ORACLE).trim(),
     eventLookbackLedgers: parsePositiveInt(
       env.EVENT_LOOKBACK_LEDGERS,
       DEFAULT_EVENT_LOOKBACK_LEDGERS,
@@ -193,6 +200,8 @@ export function redactedConfig(c: KeeperConfig): Record<string, unknown> {
     oracleAdapterId: c.oracleAdapterId,
     pollIntervalMs: c.pollIntervalMs,
     simulatePrices: c.simulatePrices,
+    relayReflector: c.relayReflector,
+    reflectorOracleId: c.reflectorOracleId,
     eventLookbackLedgers: c.eventLookbackLedgers,
     statePath: c.statePath,
   };

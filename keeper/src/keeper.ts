@@ -61,6 +61,8 @@ export interface CycleResult {
   notLiquidatable: number;
   pricesSimulated: number;
   pricesRelayed: number;
+  ordersFilled: number;
+  ordersPending: number;
 }
 
 export class Keeper {
@@ -83,6 +85,8 @@ export class Keeper {
       notLiquidatable: 0,
       pricesSimulated: 0,
       pricesRelayed: 0,
+      ordersFilled: 0,
+      ordersPending: 0,
     };
 
     const startedAt = Date.now();
@@ -103,10 +107,39 @@ export class Keeper {
       captureError(err, { scope: "indexer.sync" });
     }
 
+    await this.executeOrders(result);
     await this.scanLiquidations(result);
 
     log.info("cycle done", { ...result, durationMs: Date.now() - startedAt });
     return result;
+  }
+
+  // --- conditional orders ---------------------------------------------------
+
+  /**
+   * Attempt to fill every resting order. `execute_order` re-checks the trigger
+   * on-chain and reverts `OrderNotTriggerable` when the price hasn't crossed —
+   * we treat that as a normal "not yet" outcome, exactly like `NotLiquidatable`.
+   */
+  private async executeOrders(result: CycleResult): Promise<void> {
+    const ids = this.indexer.openOrderIds();
+    log.info("checking orders", { count: ids.length });
+    for (const id of ids) {
+      try {
+        await this.client.invoke(this.config.perpEngineId, "execute_order", [
+          StellarClient.addressScVal(this.client.keeperPublicKey),
+          StellarClient.u64ScVal(id),
+        ]);
+        result.ordersFilled++;
+        log.info("order filled", { id: id.toString() });
+      } catch (err) {
+        if (isNotTriggerable(err)) {
+          result.ordersPending++;
+        } else {
+          captureError(err, { scope: "execute_order", id: id.toString() });
+        }
+      }
+    }
   }
 
   // --- step 1: price source (relay real Reflector, else simulate) ----------
@@ -267,5 +300,23 @@ function isNotLiquidatable(err: unknown): boolean {
     /NotLiquidatable/i.test(raw) ||
     /Error\(Contract,\s*#?11\)/i.test(raw) ||
     /#11\b/.test(raw)
+  );
+}
+
+/**
+ * Detect the engine's `OrderNotTriggerable` error (variant #16) — an order whose
+ * price trigger has not been crossed yet. The expected, benign outcome each cycle.
+ */
+function isNotTriggerable(err: unknown): boolean {
+  const raw =
+    err instanceof ContractCallError
+      ? err.raw + " " + err.message
+      : err instanceof Error
+        ? err.message
+        : String(err);
+  return (
+    /OrderNotTriggerable/i.test(raw) ||
+    /Error\(Contract,\s*#?16\)/i.test(raw) ||
+    /#16\b/.test(raw)
   );
 }

@@ -6,6 +6,7 @@ import {
   type LucideIcon,
   Receipt,
   Settings,
+  Trophy,
   Wallet,
 } from "lucide-react";
 
@@ -32,6 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Monitor",
     items: [
       { href: "/activity", label: "Activity", icon: Activity },
+      { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
       { href: "/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/transactions", label: "Transactions", icon: Receipt },
     ],
